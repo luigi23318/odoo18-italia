@@ -1,0 +1,60 @@
+name: Aggiornamento Odoo 18 Italia OCA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: '18.0'
+
+      - name: Scarica e aggiorna moduli OCA
+        run: |
+          mkdir -p /tmp/oca
+
+          # Definisci repo OCA e moduli da estrarre
+          declare -A REPOS
+          REPOS=(
+            ["l10n-italy"]="l10n_it_abicab l10n_it_accompanying_invoice l10n_it_account l10n_it_account_invoice_start_end_dates l10n_it_account_stamp l10n_it_account_vat_period_end_settlement l10n_it_appointment_code l10n_it_asset_management l10n_it_ateco l10n_it_bill_of_entry l10n_it_central_journal_reportlab l10n_it_currency_rate_update_boi l10n_it_delivery_note l10n_it_delivery_note_batch l10n_it_delivery_note_order_link l10n_it_edi_doi_extension l10n_it_edi_extension l10n_it_edi_related_document l10n_it_financial_statement_eu l10n_it_financial_statements_report l10n_it_fiscalcode_sale l10n_it_intrastat l10n_it_intrastat_statement l10n_it_location_nuts l10n_it_riba_oca l10n_it_vat_registries l10n_it_vat_settlement_communication l10n_it_vat_settlement_date l10n_it_website_portal_fiscalcode"
+            ["account-financial-reporting"]="account_financial_report account_tax_balance"
+            ["account-payment"]="account_due_list account_payment_term_extension"
+            ["server-tools"]="base_tier_validation date_range"
+            ["partner-contact"]="partner_firstname base_location base_location_nuts"
+            ["reporting-engine"]="report_xlsx report_xlsx_helper report_xml mis_builder"
+            ["account-financial-tools"]="account_fiscal_year account_move_name_sequence"
+            ["account-invoicing"]="account_invoice_start_end_dates"
+            ["delivery-carrier"]="delivery_carrier_partner"
+            ["currency"]="currency_rate_update"
+            ["crm"]="crm_lead_code crm_lead_firstname crm_lead_vat"
+          )
+
+          for repo in "${!REPOS[@]}"; do
+            echo "=== Scaricando OCA/$repo ==="
+            curl -sL -o /tmp/oca/$repo.zip https://github.com/OCA/$repo/archive/refs/heads/18.0.zip
+            unzip -q /tmp/oca/$repo.zip -d /tmp/oca/
+
+            for module in ${REPOS[$repo]}; do
+              src="/tmp/oca/${repo}-18.0/${module}"
+              if [ -d "$src" ]; then
+                echo "  Aggiornando $module"
+                rm -rf "./$module"
+                cp -r "$src" "./$module"
+              else
+                echo "  ATTENZIONE: $module non trovato in OCA/$repo"
+              fi
+            done
+
+            rm -rf /tmp/oca/${repo}-18.0
+          done
+
+      - name: Commit e push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "Aggiornamento OCA Italia - $(date +%Y-%m-%d)"
+          git push
