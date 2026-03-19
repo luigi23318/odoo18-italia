@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_acube_mixin_invoice_user,acube.mixin.invoice.user,model_acube_mixin,account.group_account_invoice,1,0,0,0
+access_acube_import_pdf_wizard_invoice_user,acube.import.pdf.wizard.invoice.user,model_acube_import_pdf_wizard,account.group_account_invoice,1,1,1,1
+access_acube_import_pdf_wizard_line_invoice_user,acube.import.pdf.wizard.line.invoice.user,model_acube_import_pdf_wizard_line,account.group_account_invoice,1,1,1,1
