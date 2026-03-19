@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================ -->
+    <!-- WIZARD SINGOLO: Import un PDF alla volta                         -->
+    <!-- ================================================================ -->
+
+    <record id="acube_import_pdf_wizard_form" model="ir.ui.view">
+        <field name="name">acube.import.pdf.wizard.form</field>
+        <field name="model">acube.import.pdf.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Importa fattura estera da PDF">
+
+                <!-- STEP 1: Upload -->
+                <div invisible="state != 'upload'">
+                    <div class="alert alert-info">
+                        <strong>Conversione PDF → Fattura con AI</strong>
+                        <p class="mb0">Carica il PDF di una fattura estera. L'AI estrarrà i dati e creerà una bozza di fattura fornitore.</p>
+                    </div>
+                    <group>
+                        <group string="File">
+                            <field name="pdf_file" filename="pdf_filename"/>
+                            <field name="pdf_filename" invisible="1"/>
+                        </group>
+                        <group string="Opzioni">
+                            <field name="default_vat_rate"/>
+                            <field name="convert_amounts"/>
+                        </group>
+                    </group>
+                </div>
+
+                <!-- STEP 2: Processing -->
+                <div invisible="state != 'processing'">
+                    <div class="alert alert-warning">
+                        <strong>Elaborazione in corso...</strong>
+                        <p class="mb0">L'AI sta analizzando il PDF. Attendere 10-30 secondi.</p>
+                    </div>
+                    <group>
+                        <field name="job_uuid" readonly="1"/>
+                        <field name="job_status" readonly="1"/>
+                    </group>
+                </div>
+
+                <!-- STEP 3: Review -->
+                <div invisible="state != 'review'">
+                    <div class="alert alert-warning">
+                        <strong>Verifica i dati estratti</strong>
+                        <p class="mb0">Controlla e correggi i dati. Seleziona il <strong>Tipo Documento</strong> corretto (l'AI non lo determina).</p>
+                    </div>
+                    <group>
+                        <group string="Fornitore">
+                            <field name="supplier_name"/>
+                            <field name="supplier_vat"/>
+                            <field name="supplier_country_code"/>
+                        </group>
+                        <group string="Documento">
+                            <field name="invoice_number"/>
+                            <field name="invoice_date"/>
+                            <field name="total_amount"/>
+                            <field name="currency_code" readonly="1"/>
+                            <field name="tipo_documento"/>
+                        </group>
+                    </group>
+                    <separator string="Righe fattura"/>
+                    <field name="line_ids" nolabel="1">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="description"/>
+                            <field name="quantity"/>
+                            <field name="price_unit"/>
+                            <field name="vat_rate"/>
+                            <field name="subtotal" sum="Totale"/>
+                        </list>
+                    </field>
+                </div>
+
+                <!-- STEP 4: Done -->
+                <div invisible="state != 'done'">
+                    <div class="alert alert-success">
+                        <strong>Fattura creata con successo!</strong>
+                        <p class="mb0">PDF e XML sono allegati alla fattura.</p>
+                    </div>
+                    <group>
+                        <field name="invoice_id"/>
+                    </group>
+                </div>
+
+                <field name="state" invisible="1"/>
+                <field name="job_error" invisible="state != 'upload' or not job_error"/>
+
+                <footer>
+                    <button name="action_upload_and_extract" string="Carica e Analizza"
+                            type="object" class="btn-primary" invisible="state != 'upload'"/>
+                    <button name="action_create_invoice" string="Crea Fattura Fornitore"
+                            type="object" class="btn-primary" invisible="state != 'review'"/>
+                    <button string="Chiudi" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- WIZARD BATCH: Import più PDF o ZIP                               -->
+    <!-- ================================================================ -->
+
+    <record id="acube_import_pdf_batch_wizard_form" model="ir.ui.view">
+        <field name="name">acube.import.pdf.batch.wizard.form</field>
+        <field name="model">acube.import.pdf.batch.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import batch fatture estere da PDF">
+
+                <!-- STEP 1: Upload -->
+                <div invisible="state != 'upload'">
+                    <div class="alert alert-info">
+                        <strong>Import multiplo di fatture PDF</strong>
+                        <p class="mb0">Carica più file PDF singolarmente oppure un unico file ZIP che li contiene.
+                        Ogni PDF verrà analizzato dall'AI e convertito in una bozza di fattura fornitore.</p>
+                    </div>
+
+                    <group>
+                        <group string="Modalità">
+                            <field name="upload_mode" widget="radio"/>
+                        </group>
+                        <group string="Opzioni">
+                            <field name="default_vat_rate"/>
+                            <field name="convert_amounts"/>
+                            <field name="default_tipo_documento"/>
+                        </group>
+                    </group>
+
+                    <!-- Multi-file -->
+                    <div invisible="upload_mode != 'multi'">
+                        <separator string="File PDF"/>
+                        <field name="file_ids" nolabel="1">
+                            <list editable="bottom">
+                                <field name="pdf_file" filename="pdf_filename"/>
+                                <field name="pdf_filename" invisible="1"/>
+                            </list>
+                        </field>
+                    </div>
+
+                    <!-- ZIP -->
+                    <div invisible="upload_mode != 'zip'">
+                        <separator string="File ZIP"/>
+                        <group>
+                            <field name="zip_file" filename="zip_filename"/>
+                            <field name="zip_filename" invisible="1"/>
+                        </group>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Processing -->
+                <div invisible="state != 'processing'">
+                    <div class="alert alert-warning">
+                        <strong>Elaborazione in corso...</strong>
+                        <p class="mb0">Ogni PDF viene analizzato e convertito in sequenza. Non chiudere la finestra.</p>
+                    </div>
+                    <group>
+                        <field name="total_files"/>
+                        <field name="processed_files"/>
+                        <field name="success_count"/>
+                        <field name="error_count"/>
+                    </group>
+                </div>
+
+                <!-- STEP 3: Done -->
+                <div invisible="state != 'done'">
+                    <div class="alert alert-success">
+                        <strong>Elaborazione completata!</strong>
+                        <p class="mb0">
+                            <field name="success_count" class="oe_inline"/> riusciti,
+                            <field name="error_count" class="oe_inline"/> errori
+                            su <field name="total_files" class="oe_inline"/> file totali.
+                        </p>
+                    </div>
+                    <separator string="Risultati"/>
+                    <field name="result_ids" nolabel="1">
+                        <list>
+                            <field name="filename"/>
+                            <field name="status" decoration-success="status == 'success'"
+                                   decoration-danger="status == 'error'" widget="badge"/>
+                            <field name="message"/>
+                            <field name="invoice_id"/>
+                        </list>
+                    </field>
+                </div>
+
+                <field name="state" invisible="1"/>
+
+                <footer>
+                    <button name="action_process_batch" string="Avvia Elaborazione Batch"
+                            type="object" class="btn-primary" invisible="state != 'upload'"/>
+                    <button string="Chiudi" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- AZIONI                                                           -->
+    <!-- ================================================================ -->
+
+    <record id="action_acube_import_pdf" model="ir.actions.act_window">
+        <field name="name">Importa fattura da PDF (singola)</field>
+        <field name="res_model">acube.import.pdf.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_acube_import_pdf_batch" model="ir.actions.act_window">
+        <field name="name">Importa fatture da PDF (batch)</field>
+        <field name="res_model">acube.import.pdf.batch.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- MENU sotto Contabilità → Fornitori                               -->
+    <!-- ================================================================ -->
+
+    <menuitem id="menu_acube_import_pdf"
+              name="Importa fattura estera da PDF"
+              parent="account.menu_finance_payables"
+              action="action_acube_import_pdf"
+              sequence="100"/>
+
+    <menuitem id="menu_acube_import_pdf_batch"
+              name="Importa fatture estere da PDF (batch)"
+              parent="account.menu_finance_payables"
+              action="action_acube_import_pdf_batch"
+              sequence="101"/>
+
+</odoo>
