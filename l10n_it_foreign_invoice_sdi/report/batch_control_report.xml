@@ -131,13 +131,6 @@
         </t>
     </template>
 
-    <!-- Excel export action -->
-    <record id="action_batch_summary_xlsx" model="ir.actions.server">
-        <field name="name">Esporta Excel riepilogo batch</field>
-        <field name="model_id" ref="model_foreign_invoice_batch"/>
-        <field name="state">code</field>
-        <field name="code">action = model.browse(active_ids).action_export_xlsx()</field>
-        <field name="binding_model_id" ref="model_foreign_invoice_batch"/>
-    </record>
+    <!-- Excel export action (richiamata via pulsante type="object" nella vista batch) -->
 
 </odoo>

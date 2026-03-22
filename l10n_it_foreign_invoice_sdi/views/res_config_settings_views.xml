@@ -105,12 +105,7 @@
                     </div>
 
                     <!-- Invio SDI via Aruba Premium -->
-                    <div invisible="foreign_invoice_extraction_engine == 'acube'">
-                        <h3 class="mt16">Invio SDI via Aruba Premium</h3>
-                    </div>
-                    <div invisible="foreign_invoice_extraction_engine != 'acube'">
-                        <h3 class="mt16">Invio SDI via Aruba Premium</h3>
-                    </div>
+                    <h3 class="mt16">Invio SDI via Aruba Premium</h3>
                     <div class="row o_settings_container">
                         <div class="col-12 col-lg-6 o_setting_box">
                             <div class="o_setting_left_pane">

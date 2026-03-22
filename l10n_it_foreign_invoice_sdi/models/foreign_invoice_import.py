@@ -537,3 +537,12 @@ class ForeignInvoiceImport(models.Model):
                     _('Impossibile riportare in bozza una fattura registrata.')
                 )
             rec.state = 'bozza'
+
+    @api.model
+    def cron_poll_sdi_notifications(self) -> None:
+        """Cron job: polling notifiche SDI per tutte le fatture inviate.
+
+        Delegato a aruba.sdi.service.
+        """
+        sdi_service = self.env['aruba.sdi.service']
+        sdi_service.cron_poll_sdi_notifications()

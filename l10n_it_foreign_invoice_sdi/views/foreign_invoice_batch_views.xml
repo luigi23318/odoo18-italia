@@ -40,9 +40,9 @@
                             string="Registra tutti in contabilità"
                             type="object"
                             invisible="state not in ('inviato', 'completato')"/>
-                    <button name="%(l10n_it_foreign_invoice_sdi.action_batch_summary_xlsx)d"
+                    <button name="action_export_xlsx"
                             string="Scarica report Excel"
-                            type="action"
+                            type="object"
                             invisible="total_invoices == 0"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="bozza,elaborato,validato,xml_generato,inviato,completato"/>
