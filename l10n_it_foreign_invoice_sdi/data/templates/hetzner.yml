@@ -1,0 +1,20 @@
+issuer: Hetzner Online GmbH
+keywords:
+  - Hetzner Online GmbH
+  - DE812871812
+fields:
+  invoice_number: 'Invoice\s+No\.?\s+(\S+)'
+  date: 'Invoice\s+Date[:\s]+(\d{2}\.\d{2}\.\d{4})'
+  amount_total: 'Total\s+EUR\s+([\d.,]+)'
+  amount_untaxed: 'Net\s+Amount\s+EUR\s+([\d.,]+)'
+  vat_amount: 'VAT.*EUR\s+([\d.,]+)'
+options:
+  currency: EUR
+  date_formats:
+    - '%d.%m.%Y'
+  decimal_separator: ','
+static_fields:
+  supplier_vat: DE812871812
+  supplier_country: DE
+  tipo_documento: TD17
+  description_type: SERVIZI
