@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Batch form view -->
+    <record id="view_foreign_invoice_batch_form" model="ir.ui.view">
+        <field name="name">foreign.invoice.batch.form</field>
+        <field name="model">foreign.invoice.batch</field>
+        <field name="arch" type="xml">
+            <form string="Batch fatture estere">
+                <header>
+                    <button name="action_apply_defaults"
+                            string="Applica default a tutti"
+                            type="object"
+                            invisible="state not in ('bozza', 'elaborato', 'in_revisione')"/>
+                    <button name="action_extract_all"
+                            string="Estrai tutti"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'bozza'"/>
+                    <button name="action_validate_all"
+                            string="Valida tutto"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state not in ('elaborato', 'in_revisione')"/>
+                    <button name="action_generate_all_xml"
+                            string="Genera tutti XML"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state not in ('validato', 'in_revisione')"/>
+                    <button name="action_send_all_sdi"
+                            string="Invia tutti al SDI"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'xml_generato'"/>
+                    <button name="action_download_zip_xml"
+                            string="Scarica ZIP XML"
+                            type="object"
+                            invisible="state not in ('xml_generato', 'inviato', 'completato')"/>
+                    <button name="action_register_all_accounting"
+                            string="Registra tutti in contabilità"
+                            type="object"
+                            invisible="state not in ('inviato', 'completato')"/>
+                    <button name="%(l10n_it_foreign_invoice_sdi.action_batch_summary_xlsx)d"
+                            string="Scarica report Excel"
+                            type="action"
+                            invisible="total_invoices == 0"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="bozza,elaborato,validato,xml_generato,inviato,completato"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Default batch">
+                            <field name="reception_date_default"/>
+                            <field name="tipo_documento_default"/>
+                            <field name="it_tax_id_default"/>
+                            <field name="natura_code_default"/>
+                        </group>
+                        <group string="Riepilogo">
+                            <field name="total_invoices"/>
+                            <field name="total_matched"/>
+                            <field name="total_unmatched"/>
+                            <field name="total_validated"/>
+                            <field name="total_errors"/>
+                            <field name="total_amount"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <!-- Tab 1: Fatture -->
+                        <page string="Fatture" name="invoices">
+                            <field name="invoice_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="supplier_name"/>
+                                    <field name="invoice_number"/>
+                                    <field name="invoice_date"/>
+                                    <field name="tipo_documento"/>
+                                    <field name="amount_total" sum="Totale"/>
+                                    <field name="currency_id"/>
+                                    <field name="template_matched"/>
+                                    <field name="state"
+                                           decoration-info="state in ('bozza', 'testo_estratto')"
+                                           decoration-warning="state in ('nessun_template', 'in_revisione')"
+                                           decoration-success="state in ('validato', 'xml_generato', 'consegnato', 'registrato')"
+                                           decoration-danger="state == 'scartato'"
+                                           widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 2: Report controllo -->
+                        <page string="Report controllo" name="control_report">
+                            <group>
+                                <button name="action_print_control_report"
+                                        string="Stampa report PDF"
+                                        type="object"
+                                        class="btn-secondary"
+                                        icon="fa-print"/>
+                            </group>
+                            <group string="Segnalazioni">
+                                <div class="oe_structure"/>
+                            </group>
+                        </page>
+
+                        <!-- Tab 3: Dashboard -->
+                        <page string="Dashboard" name="dashboard">
+                            <group>
+                                <group string="Contatori">
+                                    <div class="row">
+                                        <div class="col-md-3 text-center">
+                                            <h3><field name="total_invoices" readonly="1"/></h3>
+                                            <p>Totale</p>
+                                        </div>
+                                        <div class="col-md-3 text-center">
+                                            <h3><field name="total_validated" readonly="1"/></h3>
+                                            <p>Validate</p>
+                                        </div>
+                                        <div class="col-md-3 text-center">
+                                            <h3><field name="total_sent_sdi" readonly="1"/></h3>
+                                            <p>Inviate SDI</p>
+                                        </div>
+                                        <div class="col-md-3 text-center">
+                                            <h3><field name="total_delivered_sdi" readonly="1"/></h3>
+                                            <p>Consegnate SDI</p>
+                                        </div>
+                                    </div>
+                                </group>
+                                <group string="Errori">
+                                    <field name="total_errors" readonly="1"/>
+                                    <field name="total_rejected_sdi" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Batch list view -->
+    <record id="view_foreign_invoice_batch_list" model="ir.ui.view">
+        <field name="name">foreign.invoice.batch.list</field>
+        <field name="model">foreign.invoice.batch</field>
+        <field name="arch" type="xml">
+            <list string="Batch fatture estere">
+                <field name="name"/>
+                <field name="reception_date_default"/>
+                <field name="tipo_documento_default"/>
+                <field name="total_invoices"/>
+                <field name="total_validated"/>
+                <field name="total_amount" sum="Totale"/>
+                <field name="state"
+                       decoration-info="state in ('bozza', 'in_elaborazione')"
+                       decoration-warning="state in ('elaborato', 'in_revisione')"
+                       decoration-success="state in ('validato', 'xml_generato', 'inviato', 'completato')"
+                       decoration-danger="state == 'errore'"
+                       widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Batch search view -->
+    <record id="view_foreign_invoice_batch_search" model="ir.ui.view">
+        <field name="name">foreign.invoice.batch.search</field>
+        <field name="model">foreign.invoice.batch</field>
+        <field name="arch" type="xml">
+            <search string="Cerca batch">
+                <field name="name"/>
+                <filter string="Bozza" name="draft" domain="[('state', '=', 'bozza')]"/>
+                <filter string="In lavorazione" name="working"
+                        domain="[('state', 'in', ('in_elaborazione', 'elaborato', 'in_revisione'))]"/>
+                <filter string="Completati" name="done"
+                        domain="[('state', '=', 'completato')]"/>
+                <group expand="0" string="Raggruppa per">
+                    <filter string="Stato" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>

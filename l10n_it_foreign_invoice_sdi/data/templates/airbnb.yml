@@ -1,0 +1,21 @@
+issuer: Airbnb Ireland UC
+keywords:
+  - Airbnb Ireland
+  - IE9827384L
+fields:
+  invoice_number: 'Invoice\s+(?:number|#|ID)[:\s]+(\S+)'
+  date: 'Invoice\s+date[:\s]+(\d{2}/\d{2}/\d{4})'
+  amount_total: 'Total[:\s]+EUR\s*([\d.,]+)'
+  amount_untaxed: '(?:Subtotal|Net)[:\s]+EUR\s*([\d.,]+)'
+  vat_amount: '(?:VAT|Tax)[:\s]+EUR\s*([\d.,]+)'
+options:
+  currency: EUR
+  date_formats:
+    - '%d/%m/%Y'
+    - '%m/%d/%Y'
+  decimal_separator: '.'
+static_fields:
+  supplier_vat: IE9827384L
+  supplier_country: IE
+  tipo_documento: TD17
+  description_type: SERVIZI
