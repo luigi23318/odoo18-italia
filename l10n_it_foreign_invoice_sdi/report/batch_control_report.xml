@@ -131,6 +131,4 @@
         </t>
     </template>
 
-    <!-- Excel export action (richiamata via pulsante type="object" nella vista batch) -->
-
 </odoo>

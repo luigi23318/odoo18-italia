@@ -1,0 +1,21 @@
+issuer: OVH SAS
+keywords:
+  - OVH SAS
+  - OVHcloud
+  - FR22424761419
+fields:
+  invoice_number: '(?:Facture|Invoice)\s+(?:n°|No\.?|#)\s*(\S+)'
+  date: '(?:Date\s+de\s+facturation|Invoice\s+date)[:\s]+(\d{2}/\d{2}/\d{4})'
+  amount_total: '(?:Total\s+TTC|Total)[:\s]+(?:EUR\s+)?([\d.,]+)\s*(?:EUR)?'
+  amount_untaxed: '(?:Total\s+HT|Subtotal)[:\s]+(?:EUR\s+)?([\d.,]+)\s*(?:EUR)?'
+  vat_amount: '(?:TVA|VAT)[:\s]+(?:EUR\s+)?([\d.,]+)\s*(?:EUR)?'
+options:
+  currency: EUR
+  date_formats:
+    - '%d/%m/%Y'
+  decimal_separator: ','
+static_fields:
+  supplier_vat: FR22424761419
+  supplier_country: FR
+  tipo_documento: TD17
+  description_type: SERVIZI

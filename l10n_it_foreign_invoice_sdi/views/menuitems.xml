@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 2 voci sotto Fatture fornitori -->
+    <menuitem id="menu_foreign_invoice_import_single"
+              name="Importa fattura estera da PDF"
+              parent="account.menu_finance_payables"
+              action="action_import_single_wizard"
+              sequence="100"/>
+
+    <menuitem id="menu_foreign_invoice_import_batch"
+              name="Importa fatture estere da PDF (batch)"
+              parent="account.menu_finance_payables"
+              action="action_import_batch_wizard"
+              sequence="101"/>
+
+</odoo>

@@ -2,7 +2,7 @@ import base64
 import logging
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -94,23 +94,12 @@ class ForeignInvoiceImport(models.Model):
         string='XML FatturaPA',
         ondelete='set null',
     )
-    xml_filename = fields.Char(
-        string='Nome file XML',
-    )
-    xml_content = fields.Text(
-        string='Contenuto XML',
-        readonly=True,
-    )
+    xml_filename = fields.Char(string='Nome file XML')
+    xml_content = fields.Text(string='Contenuto XML', readonly=True)
 
     # OCR
-    raw_text = fields.Text(
-        string='Testo grezzo OCR',
-        readonly=True,
-    )
-    template_matched = fields.Boolean(
-        string='Template trovato',
-        default=False,
-    )
+    raw_text = fields.Text(string='Testo grezzo OCR', readonly=True)
+    template_matched = fields.Boolean(string='Template trovato', default=False)
 
     # Dati fattura
     tipo_documento = fields.Selection(
@@ -121,13 +110,9 @@ class ForeignInvoiceImport(models.Model):
     supplier_name = fields.Char(string='Denominazione fornitore')
     supplier_vat = fields.Char(string='P.IVA / Tax ID fornitore')
     supplier_country_id = fields.Many2one(
-        'res.country',
-        string='Paese fornitore',
+        'res.country', string='Paese fornitore',
     )
-    partner_id = fields.Many2one(
-        'res.partner',
-        string='Fornitore Odoo',
-    )
+    partner_id = fields.Many2one('res.partner', string='Fornitore Odoo')
     invoice_number = fields.Char(string='Numero fattura originale')
     invoice_date = fields.Date(string='Data fattura originale')
     reception_date = fields.Date(
@@ -141,8 +126,7 @@ class ForeignInvoiceImport(models.Model):
     )
     amount_untaxed = fields.Float(string='Imponibile netto', digits=(16, 2))
     amount_tax_foreign = fields.Float(
-        string='IVA estera (informativo)',
-        digits=(16, 2),
+        string='IVA estera (informativo)', digits=(16, 2),
     )
     amount_total = fields.Float(string='Totale fattura', digits=(16, 2))
 
@@ -153,8 +137,7 @@ class ForeignInvoiceImport(models.Model):
         domain=[('type_tax_use', '=', 'purchase')],
     )
     natura_code = fields.Selection(
-        selection=NATURA_CODE_SELECTION,
-        string='Codice Natura',
+        selection=NATURA_CODE_SELECTION, string='Codice Natura',
     )
     description_type = fields.Selection(
         selection=DESCRIPTION_TYPE_SELECTION,
@@ -164,29 +147,27 @@ class ForeignInvoiceImport(models.Model):
 
     # Righe
     line_ids = fields.One2many(
-        'foreign.invoice.import.line',
-        'import_id',
-        string='Righe dettaglio',
+        'foreign.invoice.import.line', 'import_id', string='Righe dettaglio',
     )
 
     # SDI
     sdi_state = fields.Selection(
-        selection=SDI_STATE_SELECTION,
-        string='Stato SDI',
+        selection=SDI_STATE_SELECTION, string='Stato SDI',
     )
     sdi_id = fields.Char(string='ID SDI')
     sdi_filename = fields.Char(string='Nome file SDI')
 
     # Contabilità
     account_move_id = fields.Many2one(
-        'account.move',
-        string='Registrazione contabile',
-        readonly=True,
+        'account.move', string='Registrazione contabile', readonly=True,
     )
 
     # Validazione
     validation_errors = fields.Text(string='Errori di validazione')
 
+    # -------------------------------------------------------------------------
+    # CRUD
+    # -------------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list: list[dict]) -> 'ForeignInvoiceImport':
         for vals in vals_list:
@@ -196,6 +177,9 @@ class ForeignInvoiceImport(models.Model):
                 ) or _('Nuovo')
         return super().create(vals_list)
 
+    # -------------------------------------------------------------------------
+    # Estrazione
+    # -------------------------------------------------------------------------
     def action_extract(self) -> None:
         """Estrae dati dal PDF usando il motore configurato."""
         self.ensure_one()
@@ -305,7 +289,7 @@ class ForeignInvoiceImport(models.Model):
         currency_code = data.get('currency_code')
         if currency_code:
             currency = self.env['res.currency'].search(
-                [('name', '=', currency_code)], limit=1
+                [('name', '=', currency_code)], limit=1,
             )
             if currency:
                 vals['currency_id'] = currency.id
@@ -314,7 +298,7 @@ class ForeignInvoiceImport(models.Model):
         country_code = data.get('country_code')
         if country_code:
             country = self.env['res.country'].search(
-                [('code', '=', country_code.upper())], limit=1
+                [('code', '=', country_code.upper())], limit=1,
             )
             if country:
                 vals['supplier_country_id'] = country.id
@@ -323,11 +307,11 @@ class ForeignInvoiceImport(models.Model):
         supplier_vat = data.get('supplier_vat')
         if supplier_vat:
             partner = self.env['res.partner'].search(
-                [('vat', '=', supplier_vat)], limit=1
+                [('vat', '=', supplier_vat)], limit=1,
             )
             if not partner:
                 partner = self.env['res.partner'].search(
-                    [('vat', 'ilike', supplier_vat)], limit=1
+                    [('vat', 'ilike', supplier_vat)], limit=1,
                 )
             if partner:
                 vals['partner_id'] = partner.id
@@ -348,6 +332,9 @@ class ForeignInvoiceImport(models.Model):
                     'tax_rate_foreign': float(li.get('tax_rate', 0)),
                 })
 
+    # -------------------------------------------------------------------------
+    # Workflow
+    # -------------------------------------------------------------------------
     def action_set_in_review(self) -> None:
         """Porta la fattura in stato revisione."""
         for rec in self:
@@ -416,9 +403,7 @@ class ForeignInvoiceImport(models.Model):
         """Invia XML allo SDI via Aruba Premium API."""
         for rec in self:
             if rec.state != 'xml_generato':
-                raise UserError(
-                    _('Generare prima l\'XML FatturaPA.')
-                )
+                raise UserError(_("Generare prima l'XML FatturaPA."))
             sdi_service = self.env['aruba.sdi.service']
             sdi_service.send_invoice(rec)
 
@@ -444,6 +429,18 @@ class ForeignInvoiceImport(models.Model):
             'target': 'self',
         }
 
+    def action_reset_to_draft(self) -> None:
+        """Riporta in bozza."""
+        for rec in self:
+            if rec.state == 'registrato':
+                raise UserError(
+                    _('Impossibile riportare in bozza una fattura registrata.')
+                )
+            rec.state = 'bozza'
+
+    # -------------------------------------------------------------------------
+    # Registrazione contabile
+    # -------------------------------------------------------------------------
     def action_register_accounting(self) -> None:
         """Registra la fattura in contabilità."""
         for rec in self:
@@ -452,9 +449,7 @@ class ForeignInvoiceImport(models.Model):
                     _('La fattura deve essere almeno in stato XML generato.')
                 )
             if rec.account_move_id:
-                raise UserError(
-                    _('Registrazione contabile già presente.')
-                )
+                raise UserError(_('Registrazione contabile già presente.'))
             rec._create_account_move()
             rec.state = 'registrato'
 
@@ -493,7 +488,6 @@ class ForeignInvoiceImport(models.Model):
 
         move = self.env['account.move'].create(move_vals)
 
-        # Collega allegati
         if self.pdf_attachment_id:
             self.pdf_attachment_id.copy({
                 'res_model': 'account.move',
@@ -507,8 +501,7 @@ class ForeignInvoiceImport(models.Model):
 
         self.account_move_id = move
         _logger.info(
-            'Registrazione contabile creata: %s per %s',
-            move.name, self.name,
+            'Registrazione contabile creata: %s per %s', move.name, self.name,
         )
 
     def _find_or_create_partner(self) -> 'res.partner':
@@ -516,7 +509,7 @@ class ForeignInvoiceImport(models.Model):
         self.ensure_one()
         if self.supplier_vat:
             partner = self.env['res.partner'].search(
-                [('vat', 'ilike', self.supplier_vat)], limit=1
+                [('vat', 'ilike', self.supplier_vat)], limit=1,
             )
             if partner:
                 return partner
@@ -524,25 +517,19 @@ class ForeignInvoiceImport(models.Model):
         return self.env['res.partner'].create({
             'name': self.supplier_name or _('Fornitore estero'),
             'vat': self.supplier_vat or False,
-            'country_id': self.supplier_country_id.id if self.supplier_country_id else False,
+            'country_id': (
+                self.supplier_country_id.id
+                if self.supplier_country_id else False
+            ),
             'supplier_rank': 1,
             'company_type': 'company',
         })
 
-    def action_reset_to_draft(self) -> None:
-        """Riporta in bozza."""
-        for rec in self:
-            if rec.state == 'registrato':
-                raise UserError(
-                    _('Impossibile riportare in bozza una fattura registrata.')
-                )
-            rec.state = 'bozza'
-
+    # -------------------------------------------------------------------------
+    # Cron SDI (delegato a aruba.sdi.service)
+    # -------------------------------------------------------------------------
     @api.model
     def cron_poll_sdi_notifications(self) -> None:
-        """Cron job: polling notifiche SDI per tutte le fatture inviate.
-
-        Delegato a aruba.sdi.service.
-        """
+        """Cron job: polling notifiche SDI per tutte le fatture inviate."""
         sdi_service = self.env['aruba.sdi.service']
         sdi_service.cron_poll_sdi_notifications()
