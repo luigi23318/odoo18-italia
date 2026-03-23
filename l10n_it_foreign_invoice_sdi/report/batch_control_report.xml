@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Report Action -->
+    <record id="action_report_batch_control" model="ir.actions.report">
+        <field name="name">Report Controllo Batch</field>
+        <field name="model">foreign.invoice.batch</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">l10n_it_foreign_invoice_sdi.report_batch_control</field>
+        <field name="report_file">l10n_it_foreign_invoice_sdi.report_batch_control</field>
+        <field name="binding_model_id" ref="model_foreign_invoice_batch"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- QWeb Template -->
+    <template id="report_batch_control">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="batch">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Report Controllo Batch</h2>
+                        <div class="row mt-3 mb-3">
+                            <div class="col-6">
+                                <table class="table table-sm table-borderless">
+                                    <tr>
+                                        <td class="fw-bold">Batch:</td>
+                                        <td><t t-out="batch.name"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Data Creazione:</td>
+                                        <td><t t-out="batch.create_date" t-options='{"widget": "date"}'/></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Stato:</td>
+                                        <td><t t-out="batch.state"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Tipo Documento:</td>
+                                        <td><t t-out="batch.document_type or '-'"/></td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-6">
+                                <table class="table table-sm table-borderless">
+                                    <tr>
+                                        <td class="fw-bold">Totale Fatture:</td>
+                                        <td><t t-out="batch.import_count"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Inviate:</td>
+                                        <td><t t-out="batch.sent_count"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Completate:</td>
+                                        <td><t t-out="batch.done_count"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold text-danger">In Errore:</td>
+                                        <td class="text-danger"><t t-out="batch.error_count"/></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Tabella dettaglio fatture -->
+                        <h4 class="mt-4">Dettaglio Fatture</h4>
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Rif.</th>
+                                    <th>Tipo</th>
+                                    <th>Fornitore</th>
+                                    <th>Nr. Fattura</th>
+                                    <th>Data</th>
+                                    <th class="text-end">Imponibile</th>
+                                    <th class="text-end">Imposta</th>
+                                    <th class="text-end">Totale</th>
+                                    <th>Stato</th>
+                                    <th>ID SDI</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="batch.import_ids" t-as="inv">
+                                    <tr t-attf-class="#{'table-danger' if inv.state in ('error', 'rejected') else ''}">
+                                        <td><t t-out="inv.name"/></td>
+                                        <td><t t-out="inv.document_type"/></td>
+                                        <td><t t-out="inv.supplier_denomination or '-'"/></td>
+                                        <td><t t-out="inv.invoice_number or '-'"/></td>
+                                        <td><t t-out="inv.invoice_date" t-options='{"widget": "date"}'/></td>
+                                        <td class="text-end">
+                                            <t t-out="inv.total_untaxed"
+                                               t-options='{"widget": "monetary", "display_currency": inv.currency_id}'/>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-out="inv.total_tax"
+                                               t-options='{"widget": "monetary", "display_currency": inv.currency_id}'/>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-out="inv.total_amount"
+                                               t-options='{"widget": "monetary", "display_currency": inv.currency_id}'/>
+                                        </td>
+                                        <td><t t-out="inv.state"/></td>
+                                        <td><t t-out="inv.sdi_file_id or '-'"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-bold">
+                                    <td colspan="5">TOTALI</td>
+                                    <td class="text-end">
+                                        <t t-out="sum(batch.import_ids.mapped('total_untaxed'))"
+                                           t-options='{"widget": "float", "precision": 2}'/>
+                                    </td>
+                                    <td class="text-end">
+                                        <t t-out="sum(batch.import_ids.mapped('total_tax'))"
+                                           t-options='{"widget": "float", "precision": 2}'/>
+                                    </td>
+                                    <td class="text-end">
+                                        <t t-out="sum(batch.import_ids.mapped('total_amount'))"
+                                           t-options='{"widget": "float", "precision": 2}'/>
+                                    </td>
+                                    <td colspan="2"/>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        <!-- Sezione errori -->
+                        <t t-set="error_invoices"
+                           t-value="batch.import_ids.filtered(lambda r: r.state in ('error', 'rejected'))"/>
+                        <t t-if="error_invoices">
+                            <h4 class="mt-4 text-danger">Fatture con Errori</h4>
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-danger">
+                                    <tr>
+                                        <th>Rif.</th>
+                                        <th>Fornitore</th>
+                                        <th>Errore</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="error_invoices" t-as="inv">
+                                        <tr>
+                                            <td><t t-out="inv.name"/></td>
+                                            <td><t t-out="inv.supplier_denomination or '-'"/></td>
+                                            <td><t t-out="inv.sdi_error_message or inv.xml_validation_errors or '-'"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </t>
+
+                        <!-- Note -->
+                        <t t-if="batch.notes">
+                            <h4 class="mt-4">Note</h4>
+                            <p><t t-out="batch.notes"/></p>
+                        </t>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

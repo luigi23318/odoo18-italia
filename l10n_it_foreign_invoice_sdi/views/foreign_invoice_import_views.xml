@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================ -->
+    <!-- FORM VIEW -->
+    <!-- ============================================================ -->
+    <record id="view_foreign_invoice_import_form" model="ir.ui.view">
+        <field name="name">foreign.invoice.import.form</field>
+        <field name="model">foreign.invoice.import</field>
+        <field name="arch" type="xml">
+            <form string="Fattura Estera">
+                <header>
+                    <button name="action_extract"
+                            string="Estrai Dati"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"
+                            confirm="Avviare l'estrazione dati dal PDF?"/>
+                    <button name="action_mark_reviewed"
+                            string="Conferma Revisione"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'extracted'"/>
+                    <button name="action_generate_xml"
+                            string="Genera XML"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'reviewed'"/>
+                    <button name="action_validate_xml"
+                            string="Valida XML"
+                            type="object"
+                            invisible="state != 'xml_generated'"/>
+                    <button name="action_send_sdi"
+                            string="Invia SDI"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'xml_validated'"
+                            confirm="Confermi l'invio al SDI?"/>
+                    <button name="action_check_sdi_status"
+                            string="Aggiorna Stato SDI"
+                            type="object"
+                            invisible="state != 'sent'"/>
+                    <button name="action_create_account_move"
+                            string="Crea Registrazione"
+                            type="object"
+                            invisible="state not in ('sent', 'delivered', 'accepted')"/>
+                    <button name="action_reset_to_draft"
+                            string="Riporta in Bozza"
+                            type="object"
+                            invisible="state in ('sent', 'delivered', 'accepted', 'draft')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,extracted,reviewed,xml_validated,sent,delivered,accepted"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_download_xml"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-download"
+                                invisible="not xml_file">
+                            <span>Download XML</span>
+                        </button>
+                        <button name="action_view_account_move"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-book"
+                                invisible="not account_move_id">
+                            <span>Registrazione</span>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Documento">
+                            <field name="document_type"/>
+                            <field name="invoice_number"/>
+                            <field name="invoice_date"/>
+                            <field name="currency_id"/>
+                            <field name="batch_id"/>
+                        </group>
+                        <group string="Estrazione">
+                            <field name="pdf_file" filename="pdf_filename"/>
+                            <field name="pdf_filename" invisible="1"/>
+                            <field name="extraction_engine"/>
+                            <field name="extraction_date"/>
+                            <field name="extraction_confidence"
+                                   widget="progressbar"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Fornitore Estero" name="supplier">
+                            <group>
+                                <group>
+                                    <field name="supplier_partner_id"/>
+                                    <field name="supplier_denomination"/>
+                                    <field name="supplier_vat"/>
+                                    <field name="supplier_tax_code"/>
+                                    <field name="supplier_country_id"/>
+                                </group>
+                                <group>
+                                    <field name="supplier_address_street"/>
+                                    <field name="supplier_address_city"/>
+                                    <field name="supplier_address_zip"/>
+                                    <field name="supplier_address_province"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Righe Fattura" name="lines">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="description"/>
+                                    <field name="product_id" optional="show"/>
+                                    <field name="quantity"/>
+                                    <field name="uom" optional="hide"/>
+                                    <field name="unit_price"/>
+                                    <field name="discount" optional="hide"/>
+                                    <field name="tax_rate"/>
+                                    <field name="natura" optional="hide"/>
+                                    <field name="price_subtotal"/>
+                                    <field name="tax_amount"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer">
+                                <field name="total_untaxed"/>
+                                <field name="total_tax"/>
+                                <field name="total_amount" class="oe_subtotal_footer_separator"/>
+                            </group>
+                        </page>
+                        <page string="Revisione" name="review">
+                            <group>
+                                <group>
+                                    <field name="reviewed"/>
+                                    <field name="reviewer_id"/>
+                                    <field name="review_date"/>
+                                </group>
+                                <group>
+                                    <field name="review_notes"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="XML / SDI" name="sdi">
+                            <group>
+                                <group string="XML FatturaPA">
+                                    <field name="xml_file" filename="xml_filename"/>
+                                    <field name="xml_filename" invisible="1"/>
+                                    <field name="xml_generation_date"/>
+                                    <field name="progressive_number"/>
+                                    <field name="xml_validation_errors"/>
+                                </group>
+                                <group string="Stato SDI">
+                                    <field name="sdi_file_id"/>
+                                    <field name="sdi_send_date"/>
+                                    <field name="sdi_delivery_date"/>
+                                    <field name="sdi_error_message"/>
+                                </group>
+                            </group>
+                            <field name="sdi_notification_ids">
+                                <list>
+                                    <field name="notification_type"/>
+                                    <field name="notification_date"/>
+                                    <field name="sdi_message_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Contabilità" name="accounting">
+                            <group>
+                                <field name="journal_id"/>
+                                <field name="account_move_id"/>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- LIST VIEW -->
+    <!-- ============================================================ -->
+    <record id="view_foreign_invoice_import_list" model="ir.ui.view">
+        <field name="name">foreign.invoice.import.list</field>
+        <field name="model">foreign.invoice.import</field>
+        <field name="arch" type="xml">
+            <list string="Fatture Estere"
+                  decoration-danger="state == 'error'"
+                  decoration-success="state == 'accepted'"
+                  decoration-info="state == 'sent'">
+                <field name="name"/>
+                <field name="document_type"/>
+                <field name="supplier_denomination"/>
+                <field name="invoice_number"/>
+                <field name="invoice_date"/>
+                <field name="total_amount"/>
+                <field name="currency_id" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-danger="state == 'error'"
+                       decoration-success="state == 'accepted'"
+                       decoration-info="state in ('sent', 'delivered')"
+                       decoration-warning="state == 'rejected'"/>
+                <field name="batch_id" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- SEARCH VIEW -->
+    <!-- ============================================================ -->
+    <record id="view_foreign_invoice_import_search" model="ir.ui.view">
+        <field name="name">foreign.invoice.import.search</field>
+        <field name="model">foreign.invoice.import</field>
+        <field name="arch" type="xml">
+            <search string="Cerca Fatture Estere">
+                <field name="name"/>
+                <field name="supplier_denomination"/>
+                <field name="supplier_vat"/>
+                <field name="invoice_number"/>
+                <filter name="draft" string="Bozza"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="to_review" string="Da Revisionare"
+                        domain="[('state', '=', 'extracted')]"/>
+                <filter name="to_send" string="Da Inviare"
+                        domain="[('state', '=', 'xml_validated')]"/>
+                <filter name="sent" string="Inviate"
+                        domain="[('state', 'in', ('sent', 'delivered'))]"/>
+                <filter name="accepted" string="Accettate"
+                        domain="[('state', '=', 'accepted')]"/>
+                <filter name="error" string="In Errore"
+                        domain="[('state', 'in', ('error', 'rejected'))]"/>
+                <separator/>
+                <filter name="td17" string="TD17 - Servizi"
+                        domain="[('document_type', '=', 'TD17')]"/>
+                <filter name="td18" string="TD18 - Beni IntraUE"
+                        domain="[('document_type', '=', 'TD18')]"/>
+                <filter name="td19" string="TD19 - Beni art.17"
+                        domain="[('document_type', '=', 'TD19')]"/>
+                <separator/>
+                <group expand="0" string="Raggruppa per">
+                    <filter name="group_state" string="Stato"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_type" string="Tipo Documento"
+                            context="{'group_by': 'document_type'}"/>
+                    <filter name="group_batch" string="Batch"
+                            context="{'group_by': 'batch_id'}"/>
+                    <filter name="group_supplier" string="Fornitore"
+                            context="{'group_by': 'supplier_partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- ACTION -->
+    <!-- ============================================================ -->
+    <record id="action_foreign_invoice_import" model="ir.actions.act_window">
+        <field name="name">Fatture Estere</field>
+        <field name="res_model">foreign.invoice.import</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_foreign_invoice_import_search"/>
+        <field name="context">{'search_default_draft': 0}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Importa la tua prima fattura estera
+            </p>
+            <p>
+                Carica il PDF di una fattura estera e genera automaticamente
+                l'XML FatturaPA per l'invio al SDI.
+            </p>
+        </field>
+    </record>
+
+</odoo>
