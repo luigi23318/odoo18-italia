@@ -31,6 +31,8 @@ Funzionalita:
         'views/foreign_invoice_batch_views.xml',
         'views/res_config_settings_views.xml',
         'views/menuitems.xml',
+        'wizards/import_single_wizard_views.xml',
+        'wizards/import_batch_wizard_views.xml',
     ],
     'installable': True,
     'application': False,

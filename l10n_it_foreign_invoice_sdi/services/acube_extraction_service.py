@@ -1,139 +1,102 @@
 import base64
 import logging
-import time
-from typing import Optional
 
 import requests
+
+from odoo import api, models, _
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
 
-class AcubeExtractionService:
-    """Client A-Cube API per estrazione dati da PDF fattura.
+class AcubeExtractionService(models.AbstractModel):
+    _name = 'foreign.invoice.acube.extraction.service'
+    _description = 'Servizio Estrazione A-Cube Cloud API'
 
-    A-Cube e' usato SOLO per estrazione, NON per invio SDI.
-    """
-
-    MAX_RETRIES = 3
-    INITIAL_BACKOFF = 1  # secondi
-
-    def __init__(self, env) -> None:
-        ICP = env['ir.config_parameter'].sudo()
-        self.email = ICP.get_param('foreign_invoice.acube_email', '')
-        self.password = ICP.get_param('foreign_invoice.acube_password', '')
-        self.environment = ICP.get_param(
-            'foreign_invoice.acube_environment', 'sandbox',
-        )
-        if self.environment == 'sandbox':
-            self.base_url = 'https://api-sandbox.acubeapi.com'
-            self.common_url = 'https://common-sandbox.api.acubeapi.com'
-        else:
-            self.base_url = 'https://api.acubeapi.com'
-            self.common_url = 'https://common.api.acubeapi.com'
-        self.token: Optional[str] = None
-
-    def _authenticate(self) -> None:
-        """Login A-Cube, ottiene token JWT."""
-        if not self.email or not self.password:
-            raise ValueError(
-                'Credenziali A-Cube non configurate. '
-                'Impostare email e password in Impostazioni > Contabilità.'
-            )
-        _logger.info('Autenticazione A-Cube (%s)', self.environment)
-        resp = requests.post(
-            f'{self.common_url}/login',
-            json={'email': self.email, 'password': self.password},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        self.token = resp.json().get('token')
-        if not self.token:
-            raise ValueError('Token A-Cube non ricevuto.')
-        _logger.info('Autenticazione A-Cube riuscita.')
-
-    def extract_invoice(self, attachment: 'ir.attachment') -> Optional[dict]:
-        """Invia PDF ad A-Cube, riceve JSON strutturato.
-
-        Retry con backoff esponenziale per errori 5xx.
-        Nessun retry per 4xx.
-        """
-        if not self.token:
-            self._authenticate()
-
-        pdf_content = base64.b64decode(attachment.datas)
-        _logger.info('Invio PDF a A-Cube per estrazione: %s', attachment.name)
-
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                resp = requests.post(
-                    f'{self.base_url}/invoices/extract',
-                    headers={'Authorization': f'Bearer {self.token}'},
-                    files={
-                        'file': (
-                            attachment.name, pdf_content, 'application/pdf',
-                        )
-                    },
-                    timeout=60,
-                )
-
-                if resp.status_code == 401:
-                    _logger.info('Token scaduto, re-autenticazione.')
-                    self._authenticate()
-                    continue
-
-                if resp.status_code >= 500:
-                    backoff = self.INITIAL_BACKOFF * (2 ** attempt)
-                    _logger.warning(
-                        'A-Cube errore %d, retry in %ds (tentativo %d/%d)',
-                        resp.status_code, backoff,
-                        attempt + 1, self.MAX_RETRIES,
-                    )
-                    time.sleep(backoff)
-                    continue
-
-                resp.raise_for_status()
-                data = resp.json()
-                return self._map_to_odoo(data)
-
-            except requests.exceptions.Timeout:
-                _logger.warning(
-                    'Timeout A-Cube, tentativo %d/%d',
-                    attempt + 1, self.MAX_RETRIES,
-                )
-                if attempt < self.MAX_RETRIES - 1:
-                    time.sleep(self.INITIAL_BACKOFF * (2 ** attempt))
-                    continue
-                raise
-
-        raise ValueError(
-            f'A-Cube: estrazione fallita dopo {self.MAX_RETRIES} tentativi.'
-        )
-
-    def _map_to_odoo(self, data: dict) -> dict:
-        """Converte formato JSON A-Cube in formato Odoo."""
-        supplier = data.get('supplier', {})
-        result = {
-            'invoice_number': data.get('invoice_number'),
-            'invoice_date': data.get('date'),
-            'supplier_name': supplier.get('name'),
-            'supplier_vat': supplier.get('vat_number'),
-            'country_code': supplier.get('country'),
-            'currency_code': data.get('currency'),
-            'amount_untaxed': data.get('total_net'),
-            'amount_tax': data.get('total_tax'),
-            'amount_total': data.get('total_amount'),
-            'line_items': [
-                {
-                    'description': li.get('description'),
-                    'quantity': li.get('quantity', 1),
-                    'unit_price': li.get('unit_price', 0),
-                    'total': li.get('total', 0),
-                }
-                for li in data.get('line_items', [])
-            ],
+    @api.model
+    def _get_config(self):
+        ICP = self.env['ir.config_parameter'].sudo()
+        return {
+            'api_url': ICP.get_param(
+                'l10n_it_foreign_invoice_sdi.acube_api_url',
+                'https://api.acube.cloud',
+            ),
+            'api_key': ICP.get_param(
+                'l10n_it_foreign_invoice_sdi.acube_api_key', ''
+            ),
         }
-        _logger.info(
-            'Mapping A-Cube completato: fornitore=%s, totale=%s',
-            result.get('supplier_name'), result.get('amount_total'),
-        )
+
+    @api.model
+    def extract_from_pdf(self, pdf_binary):
+        """Estrae dati fattura tramite A-Cube API.
+
+        :param pdf_binary: base64-encoded PDF content
+        :returns: dict con dati estratti
+        """
+        config = self._get_config()
+        if not config['api_key']:
+            raise UserError(
+                _('API Key A-Cube non configurata. '
+                  'Vai in Impostazioni > Fatture Estere SDI.')
+            )
+
+        url = f"{config['api_url']}/v1/invoices/extract"
+        headers = {
+            'Authorization': f"Bearer {config['api_key']}",
+            'Content-Type': 'application/json',
+        }
+        payload = {
+            'document': pdf_binary.decode('utf-8') if isinstance(pdf_binary, bytes) else pdf_binary,
+            'document_type': 'invoice',
+        }
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=60)
+            response.raise_for_status()
+            data = response.json()
+            return self._map_response(data)
+        except requests.RequestException as e:
+            _logger.error('Errore A-Cube API: %s', e)
+            raise UserError(
+                _('Errore comunicazione A-Cube: %s') % str(e)
+            ) from e
+
+    @api.model
+    def _map_response(self, data):
+        """Mappa la risposta A-Cube al formato interno.
+
+        :param data: dict risposta API
+        :returns: dict normalizzato
+        """
+        result = {
+            'confidence': data.get('confidence', 0) * 100,
+        }
+
+        # Dati fornitore
+        supplier = data.get('supplier', {})
+        if supplier.get('name'):
+            result['supplier_denomination'] = supplier['name']
+        if supplier.get('vat_number'):
+            result['supplier_vat'] = supplier['vat_number']
+
+        # Dati fattura
+        if data.get('invoice_number'):
+            result['invoice_number'] = data['invoice_number']
+        if data.get('invoice_date'):
+            result['invoice_date'] = data['invoice_date']
+        if data.get('total_amount'):
+            result['total_amount'] = data['total_amount']
+
+        # Righe
+        lines = []
+        for item in data.get('line_items', []):
+            lines.append({
+                'description': item.get('description', '/'),
+                'quantity': item.get('quantity', 1),
+                'unit_price': item.get('unit_price', 0),
+                'tax_rate': item.get('tax_rate', 0),
+            })
+        if lines:
+            result['lines'] = lines
+
         return result

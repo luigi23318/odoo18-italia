@@ -3,79 +3,102 @@ import io
 import logging
 import zipfile
 
-from odoo import fields, models, _
+from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
 
-class ForeignInvoiceImportBatchWizard(models.TransientModel):
+class ImportBatchWizard(models.TransientModel):
     _name = 'foreign.invoice.import.batch.wizard'
-    _description = 'Wizard importazione batch fatture estere da PDF'
+    _description = 'Wizard Importazione Batch Fatture Estere'
 
-    pdf_files = fields.Many2many(
-        'ir.attachment',
-        string='File PDF',
-        help='Selezionare uno o più file PDF, oppure un file ZIP contenente PDF.',
-    )
-    zip_file = fields.Binary(string='File ZIP')
-    zip_filename = fields.Char(string='Nome file ZIP')
-    reception_date = fields.Date(
-        string='Data ricezione default',
-        default=fields.Date.context_today,
+    upload_file = fields.Binary(
+        string='File ZIP con PDF',
         required=True,
+        help='Carica un file ZIP contenente i PDF delle fatture estere.',
     )
-    tipo_documento_default = fields.Selection(
+    upload_filename = fields.Char(
+        string='Nome File',
+    )
+    document_type = fields.Selection(
         selection=[
-            ('TD17', 'TD17 - Servizi'),
-            ('TD18', 'TD18 - Beni intracomunitari'),
-            ('TD19', 'TD19 - Beni già in Italia'),
+            ('TD17', 'TD17 - Servizi esteri'),
+            ('TD18', 'TD18 - Beni intraUE'),
+            ('TD19', 'TD19 - Beni art.17 c.2'),
         ],
-        string='Tipo documento default',
+        string='Tipo Documento Default',
+        required=True,
         default='TD17',
     )
+    extraction_engine = fields.Selection(
+        selection=[
+            ('tesseract', 'Tesseract OCR (Locale)'),
+            ('acube', 'A-Cube API (Cloud)'),
+        ],
+        string='Motore Estrazione',
+    )
     auto_extract = fields.Boolean(
-        string='Estrai automaticamente', default=True,
+        string='Estrai dati automaticamente',
+        default=False,
+        help='Se attivo, avvia l\'estrazione subito dopo l\'importazione.',
     )
 
-    def action_import(self) -> dict:
-        """Importa i PDF e crea il batch."""
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        ICP = self.env['ir.config_parameter'].sudo()
+        res['extraction_engine'] = ICP.get_param(
+            'l10n_it_foreign_invoice_sdi.default_extraction_engine', 'tesseract'
+        )
+        return res
+
+    def action_import(self):
+        """Importa PDF da ZIP e crea batch con fatture."""
         self.ensure_one()
+        if not self.upload_file:
+            raise UserError(_('Seleziona un file ZIP.'))
 
-        attachments = self.env['ir.attachment']
+        zip_data = base64.b64decode(self.upload_file)
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(zip_data))
+        except zipfile.BadZipFile:
+            raise UserError(_('Il file caricato non è un archivio ZIP valido.'))
 
-        if self.zip_file:
-            attachments |= self._extract_zip()
+        pdf_files = [
+            name for name in zf.namelist()
+            if name.lower().endswith('.pdf') and not name.startswith('__MACOSX')
+        ]
 
-        if self.pdf_files:
-            attachments |= self.pdf_files
+        if not pdf_files:
+            raise UserError(_('Nessun file PDF trovato nell\'archivio ZIP.'))
 
-        if not attachments:
-            raise UserError(
-                _('Selezionare almeno un file PDF o un file ZIP.')
-            )
-
+        # Crea batch
         batch = self.env['foreign.invoice.batch'].create({
-            'reception_date_default': self.reception_date,
-            'tipo_documento_default': self.tipo_documento_default,
+            'document_type': self.document_type,
         })
 
-        for att in attachments:
-            invoice = self.env['foreign.invoice.import'].create({
-                'pdf_attachment_id': att.id,
-                'reception_date': self.reception_date,
-                'tipo_documento': self.tipo_documento_default,
+        # Crea fatture
+        for pdf_name in pdf_files:
+            pdf_content = zf.read(pdf_name)
+            filename = pdf_name.split('/')[-1]
+
+            self.env['foreign.invoice.import'].create({
                 'batch_id': batch.id,
+                'document_type': self.document_type,
+                'pdf_file': base64.b64encode(pdf_content),
+                'pdf_filename': filename,
+                'extraction_engine': self.extraction_engine,
             })
-            att.write({
-                'res_model': 'foreign.invoice.import',
-                'res_id': invoice.id,
-            })
+
+        zf.close()
 
         _logger.info(
-            'Batch %s creato con %d fatture', batch.name, len(attachments),
+            'Batch %s creato con %d fatture da ZIP',
+            batch.name, len(pdf_files),
         )
 
+        # Estrazione automatica
         if self.auto_extract:
             batch.action_extract_all()
 
@@ -83,31 +106,6 @@ class ForeignInvoiceImportBatchWizard(models.TransientModel):
             'type': 'ir.actions.act_window',
             'res_model': 'foreign.invoice.batch',
             'res_id': batch.id,
-            'view_mode': 'form',
+            'views': [(False, 'form')],
             'target': 'current',
         }
-
-    def _extract_zip(self) -> 'ir.attachment':
-        """Estrae PDF da un file ZIP."""
-        attachments = self.env['ir.attachment']
-        try:
-            zip_content = base64.b64decode(self.zip_file)
-            with zipfile.ZipFile(io.BytesIO(zip_content)) as zf:
-                for name in zf.namelist():
-                    if (
-                        name.lower().endswith('.pdf')
-                        and not name.startswith('__')
-                    ):
-                        pdf_data = zf.read(name)
-                        att = self.env['ir.attachment'].create({
-                            'name': name.split('/')[-1],
-                            'type': 'binary',
-                            'datas': base64.b64encode(pdf_data),
-                            'mimetype': 'application/pdf',
-                        })
-                        attachments |= att
-        except zipfile.BadZipFile:
-            raise UserError(_('Il file ZIP non è valido.'))
-
-        _logger.info('Estratti %d PDF dal file ZIP', len(attachments))
-        return attachments

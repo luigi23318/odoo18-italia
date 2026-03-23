@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(md|txt\\)$|CLAUDE|README\")",
+      "Bash(python3 -m py_compile __init__.py)",
+      "Bash(for f:*)",
+      "Bash(do python3:*)",
+      "Bash(echo \"OK: $f\")",
+      "Bash(echo \"FAIL: $f\")"
+    ]
+  }
+}

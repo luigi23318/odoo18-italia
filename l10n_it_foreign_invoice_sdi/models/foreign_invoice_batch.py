@@ -8,306 +8,207 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
-BATCH_STATE_SELECTION = [
-    ('bozza', 'Bozza'),
-    ('in_elaborazione', 'In elaborazione'),
-    ('elaborato', 'Elaborato'),
-    ('in_revisione', 'In revisione'),
-    ('validato', 'Validato'),
-    ('xml_generato', 'XML generato'),
-    ('inviato', 'Inviato'),
-    ('completato', 'Completato'),
-    ('errore', 'Errore'),
-]
-
 
 class ForeignInvoiceBatch(models.Model):
     _name = 'foreign.invoice.batch'
-    _description = 'Batch importazione fatture estere'
+    _description = 'Batch Fatture Estere'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'create_date desc'
-    _inherit = ['mail.thread']
 
     name = fields.Char(
-        string='Riferimento',
+        string='Nome Batch',
         required=True,
-        copy=False,
         readonly=True,
-        default=lambda self: _('Nuovo'),
+        default='/',
+        copy=False,
+        tracking=True,
     )
     state = fields.Selection(
-        selection=BATCH_STATE_SELECTION,
+        selection=[
+            ('draft', 'Bozza'),
+            ('processing', 'In Elaborazione'),
+            ('extracted', 'Estratto'),
+            ('reviewed', 'Revisionato'),
+            ('xml_generated', 'XML Generati'),
+            ('sent', 'Inviato'),
+            ('done', 'Completato'),
+            ('error', 'Errore'),
+        ],
         string='Stato',
-        default='bozza',
+        default='draft',
         required=True,
         tracking=True,
     )
-
-    # Default da applicare
-    reception_date_default = fields.Date(
-        string='Data ricezione default',
-        default=fields.Date.context_today,
+    company_id = fields.Many2one(
+        'res.company',
+        string='Azienda',
+        required=True,
+        default=lambda self: self.env.company,
     )
-    tipo_documento_default = fields.Selection(
+    document_type = fields.Selection(
         selection=[
-            ('TD17', 'TD17 - Servizi'),
-            ('TD18', 'TD18 - Beni intracomunitari'),
-            ('TD19', 'TD19 - Beni già in Italia'),
+            ('TD17', 'TD17 - Servizi esteri'),
+            ('TD18', 'TD18 - Beni intraUE'),
+            ('TD19', 'TD19 - Beni art.17 c.2'),
         ],
-        string='Tipo documento default',
-        default='TD17',
+        string='Tipo Documento Default',
     )
-    it_tax_id_default = fields.Many2one(
-        'account.tax',
-        string='Aliquota IVA default',
-        domain=[('type_tax_use', '=', 'purchase')],
+    import_ids = fields.One2many(
+        'foreign.invoice.import',
+        'batch_id',
+        string='Fatture',
     )
-    natura_code_default = fields.Selection(
-        selection=[
-            ('N2.1', 'N2.1'), ('N2.2', 'N2.2'),
-            ('N3.4', 'N3.4'), ('N3.6', 'N3.6'), ('N4', 'N4'),
-        ],
-        string='Codice Natura default',
+    import_count = fields.Integer(
+        string='Numero Fatture',
+        compute='_compute_counts',
+        store=True,
     )
-
-    # Fatture
-    invoice_ids = fields.One2many(
-        'foreign.invoice.import', 'batch_id', string='Fatture',
+    error_count = fields.Integer(
+        string='Fatture in Errore',
+        compute='_compute_counts',
+        store=True,
     )
-
-    # Computed
-    total_invoices = fields.Integer(
-        string='Totale fatture', compute='_compute_totals', store=True,
+    sent_count = fields.Integer(
+        string='Fatture Inviate',
+        compute='_compute_counts',
+        store=True,
     )
-    total_matched = fields.Integer(
-        string='Con template', compute='_compute_totals', store=True,
+    done_count = fields.Integer(
+        string='Fatture Completate',
+        compute='_compute_counts',
+        store=True,
     )
-    total_unmatched = fields.Integer(
-        string='Senza template', compute='_compute_totals', store=True,
-    )
-    total_validated = fields.Integer(
-        string='Validate', compute='_compute_totals', store=True,
-    )
-    total_errors = fields.Integer(
-        string='Con errori', compute='_compute_totals', store=True,
-    )
-    total_amount = fields.Float(
-        string='Totale importi', compute='_compute_totals', store=True,
-        digits=(16, 2),
-    )
-    total_sent_sdi = fields.Integer(
-        string='Inviate SDI', compute='_compute_totals', store=True,
-    )
-    total_delivered_sdi = fields.Integer(
-        string='Consegnate SDI', compute='_compute_totals', store=True,
-    )
-    total_rejected_sdi = fields.Integer(
-        string='Scartate SDI', compute='_compute_totals', store=True,
+    notes = fields.Text(
+        string='Note',
     )
 
-    @api.depends(
-        'invoice_ids', 'invoice_ids.state', 'invoice_ids.amount_total',
-        'invoice_ids.template_matched', 'invoice_ids.validation_errors',
-    )
-    def _compute_totals(self) -> None:
+    @api.depends('import_ids', 'import_ids.state')
+    def _compute_counts(self):
         for batch in self:
-            invs = batch.invoice_ids
-            batch.total_invoices = len(invs)
-            batch.total_matched = len(invs.filtered('template_matched'))
-            batch.total_unmatched = len(
-                invs.filtered(lambda r: not r.template_matched)
-            )
-            batch.total_validated = len(
-                invs.filtered(lambda r: r.state in (
-                    'validato', 'xml_generato', 'inviato_sdi',
-                    'consegnato', 'registrato',
-                ))
-            )
-            batch.total_errors = len(
-                invs.filtered(lambda r: r.validation_errors)
-            )
-            batch.total_amount = sum(invs.mapped('amount_total'))
-            batch.total_sent_sdi = len(
-                invs.filtered(lambda r: r.state == 'inviato_sdi')
-            )
-            batch.total_delivered_sdi = len(
-                invs.filtered(lambda r: r.state == 'consegnato')
-            )
-            batch.total_rejected_sdi = len(
-                invs.filtered(lambda r: r.state == 'scartato')
-            )
+            imports = batch.import_ids
+            batch.import_count = len(imports)
+            batch.error_count = len(imports.filtered(lambda r: r.state == 'error'))
+            batch.sent_count = len(imports.filtered(lambda r: r.state in ('sent', 'delivered', 'accepted')))
+            batch.done_count = len(imports.filtered(lambda r: r.state == 'accepted'))
 
     @api.model_create_multi
-    def create(self, vals_list: list[dict]) -> 'ForeignInvoiceBatch':
+    def create(self, vals_list):
         for vals in vals_list:
-            if vals.get('name', _('Nuovo')) == _('Nuovo'):
+            if vals.get('name', '/') == '/':
                 vals['name'] = self.env['ir.sequence'].next_by_code(
                     'foreign.invoice.batch'
-                ) or _('Nuovo')
+                ) or '/'
         return super().create(vals_list)
 
     # -------------------------------------------------------------------------
-    # Azioni batch
+    # AZIONI BATCH
     # -------------------------------------------------------------------------
-    def action_apply_defaults(self) -> None:
-        """Applica i default del batch a tutte le fatture."""
-        for batch in self:
-            vals = {}
-            if batch.reception_date_default:
-                vals['reception_date'] = batch.reception_date_default
-            if batch.tipo_documento_default:
-                vals['tipo_documento'] = batch.tipo_documento_default
-            if batch.it_tax_id_default:
-                vals['it_tax_id'] = batch.it_tax_id_default.id
-            if batch.natura_code_default:
-                vals['natura_code'] = batch.natura_code_default
-            if vals:
-                batch.invoice_ids.write(vals)
-            _logger.info(
-                'Default applicati a %d fatture nel batch %s',
-                len(batch.invoice_ids), batch.name,
-            )
 
-    def action_extract_all(self) -> None:
-        """Estrae dati da tutti i PDF nel batch."""
-        for batch in self:
-            batch.state = 'in_elaborazione'
-            for inv in batch.invoice_ids.filtered(
-                lambda r: r.state == 'bozza'
-            ):
-                try:
-                    inv.action_extract()
-                except Exception as e:
-                    _logger.exception(
-                        'Errore estrazione per %s nel batch %s',
-                        inv.name, batch.name,
-                    )
-                    inv.validation_errors = str(e)
-            batch.state = 'elaborato'
-
-    def action_validate_all(self) -> None:
-        """Valida tutte le fatture nel batch."""
-        for batch in self:
-            for inv in batch.invoice_ids.filtered(
-                lambda r: r.state in (
-                    'dati_estratti', 'nessun_template', 'in_revisione',
-                )
-            ):
-                try:
-                    inv.action_validate()
-                except UserError:
-                    pass
-            if all(r.state == 'validato' for r in batch.invoice_ids):
-                batch.state = 'validato'
-            else:
-                batch.state = 'in_revisione'
-
-    def action_generate_all_xml(self) -> None:
-        """Genera XML per tutte le fatture validate."""
-        for batch in self:
-            for inv in batch.invoice_ids.filtered(
-                lambda r: r.state == 'validato'
-            ):
-                try:
-                    inv.action_generate_xml()
-                except Exception as e:
-                    _logger.exception(
-                        'Errore generazione XML per %s', inv.name,
-                    )
-                    inv.validation_errors = str(e)
-            if any(r.state == 'xml_generato' for r in batch.invoice_ids):
-                batch.state = 'xml_generato'
-
-    def action_send_all_sdi(self) -> None:
-        """Invia tutti gli XML allo SDI."""
-        for batch in self:
-            for inv in batch.invoice_ids.filtered(
-                lambda r: r.state == 'xml_generato'
-            ):
-                try:
-                    inv.action_send_sdi()
-                except Exception as e:
-                    _logger.exception(
-                        'Errore invio SDI per %s', inv.name,
-                    )
-                    inv.validation_errors = str(e)
-            if any(r.state == 'inviato_sdi' for r in batch.invoice_ids):
-                batch.state = 'inviato'
-
-    def action_download_zip_xml(self) -> dict:
-        """Genera e scarica ZIP con tutti gli XML del batch."""
+    def action_extract_all(self):
+        """Estrae dati da tutte le fatture del batch."""
         self.ensure_one()
-        xml_invoices = self.invoice_ids.filtered(
-            lambda r: r.xml_attachment_id
-        )
-        if not xml_invoices:
+        self.state = 'processing'
+        errors = []
+        for inv in self.import_ids.filtered(lambda r: r.state == 'draft'):
+            try:
+                inv.action_extract()
+            except Exception as e:
+                errors.append(f'{inv.name}: {e}')
+                inv.state = 'error'
+                inv.sdi_error_message = str(e)
+        if not errors:
+            self.state = 'extracted'
+        else:
+            self.state = 'error'
+            self.message_post(body=_('Errori estrazione:\n%s') % '\n'.join(errors))
+        return True
+
+    def action_generate_all_xml(self):
+        """Genera XML per tutte le fatture revisionate nel batch."""
+        self.ensure_one()
+        errors = []
+        for inv in self.import_ids.filtered(lambda r: r.state == 'reviewed'):
+            try:
+                inv.action_generate_xml()
+                inv.action_validate_xml()
+            except Exception as e:
+                errors.append(f'{inv.name}: {e}')
+        if not errors:
+            self.state = 'xml_generated'
+        else:
+            self.message_post(body=_('Errori generazione XML:\n%s') % '\n'.join(errors))
+        return True
+
+    def action_send_all_sdi(self):
+        """Invia tutte le fatture validate al SDI."""
+        self.ensure_one()
+        errors = []
+        for inv in self.import_ids.filtered(lambda r: r.state == 'xml_validated'):
+            try:
+                inv.action_send_sdi()
+            except Exception as e:
+                errors.append(f'{inv.name}: {e}')
+        sent = self.import_ids.filtered(lambda r: r.state in ('sent', 'delivered', 'accepted'))
+        if sent:
+            self.state = 'sent'
+        if errors:
+            self.message_post(body=_('Errori invio SDI:\n%s') % '\n'.join(errors))
+        return True
+
+    def action_check_all_sdi_status(self):
+        """Controlla stato SDI di tutte le fatture inviate."""
+        self.ensure_one()
+        for inv in self.import_ids.filtered(lambda r: r.state == 'sent'):
+            try:
+                inv.action_check_sdi_status()
+            except Exception as e:
+                _logger.warning('Errore check SDI %s: %s', inv.name, e)
+        # Aggiorna stato batch
+        if all(inv.state == 'accepted' for inv in self.import_ids):
+            self.state = 'done'
+        return True
+
+    def action_download_all_xml(self):
+        """Download ZIP con tutti gli XML del batch."""
+        self.ensure_one()
+        invoices_with_xml = self.import_ids.filtered(lambda r: r.xml_file)
+        if not invoices_with_xml:
             raise UserError(_('Nessun XML generato nel batch.'))
 
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for inv in xml_invoices:
-                att = inv.xml_attachment_id
-                zf.writestr(att.name, base64.b64decode(att.datas))
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for inv in invoices_with_xml:
+                xml_data = base64.b64decode(inv.xml_file)
+                zf.writestr(inv.xml_filename or f'{inv.name}.xml', xml_data)
 
-        zip_data = base64.b64encode(buffer.getvalue())
-        zip_name = f'{self.name}_XML.zip'
+        zip_content = base64.b64encode(zip_buffer.getvalue())
         attachment = self.env['ir.attachment'].create({
-            'name': zip_name,
+            'name': f'{self.name}_XML.zip',
+            'datas': zip_content,
             'type': 'binary',
-            'datas': zip_data,
-            'res_model': self._name,
-            'res_id': self.id,
             'mimetype': 'application/zip',
         })
         return {
             'type': 'ir.actions.act_url',
-            'url': '/web/content/%s?download=true' % attachment.id,
+            'url': f'/web/content/{attachment.id}?download=true',
             'target': 'self',
         }
 
-    def action_register_all_accounting(self) -> None:
-        """Registra tutte le fatture consegnate."""
-        for batch in self:
-            for inv in batch.invoice_ids.filtered(
-                lambda r: r.state in (
-                    'consegnato', 'xml_generato', 'inviato_sdi',
-                ) and not r.account_move_id
-            ):
-                try:
-                    inv.action_register_accounting()
-                except Exception as e:
-                    _logger.exception(
-                        'Errore registrazione contabile per %s', inv.name,
-                    )
-                    inv.validation_errors = str(e)
-            batch.state = 'completato'
+    def action_view_imports(self):
+        """Apri lista fatture del batch."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Fatture Batch %s') % self.name,
+            'res_model': 'foreign.invoice.import',
+            'domain': [('batch_id', '=', self.id)],
+            'views': [(False, 'list'), (False, 'form')],
+            'context': {'default_batch_id': self.id},
+        }
 
-    def action_print_control_report(self) -> dict:
-        """Stampa report PDF controllo batch."""
+    def action_print_control_report(self):
+        """Stampa report di controllo batch."""
+        self.ensure_one()
         return self.env.ref(
             'l10n_it_foreign_invoice_sdi.action_report_batch_control'
         ).report_action(self)
-
-    def action_export_xlsx(self) -> dict:
-        """Genera e scarica Excel riepilogo batch."""
-        self.ensure_one()
-        report = self.env[
-            'report.l10n_it_foreign_invoice_sdi.batch_summary_xlsx'
-        ]
-        xlsx_data = report._generate_xlsx(self)
-        xlsx_name = f'{self.name}_Riepilogo.xlsx'
-        attachment = self.env['ir.attachment'].create({
-            'name': xlsx_name,
-            'type': 'binary',
-            'datas': base64.b64encode(xlsx_data),
-            'res_model': self._name,
-            'res_id': self.id,
-            'mimetype': (
-                'application/vnd.openxmlformats-officedocument'
-                '.spreadsheetml.sheet'
-            ),
-        })
-        return {
-            'type': 'ir.actions.act_url',
-            'url': '/web/content/%s?download=true' % attachment.id,
-            'target': 'self',
-        }

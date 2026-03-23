@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_res_config_settings_form_foreign_invoice" model="ir.ui.view">
+        <field name="name">res.config.settings.form.foreign.invoice</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="priority">90</field>
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='account']" position="inside">
+                <block title="Fatture Estere - Integrazione SDI"
+                       name="foreign_invoice_sdi_settings">
+
+                    <!-- Motore di Estrazione -->
+                    <setting id="foreign_invoice_extraction_engine"
+                             string="Motore di Estrazione Dati"
+                             help="Seleziona il motore per estrarre i dati dai PDF delle fatture estere.">
+                        <field name="foreign_invoice_extraction_engine"
+                               widget="radio"/>
+                    </setting>
+
+                    <!-- A-Cube API -->
+                    <setting id="foreign_invoice_acube"
+                             string="Configurazione A-Cube API"
+                             help="Parametri di connessione per il servizio A-Cube Cloud OCR."
+                             invisible="foreign_invoice_extraction_engine != 'acube'">
+                        <div class="row mt16">
+                            <label for="acube_api_url" class="col-lg-3"/>
+                            <field name="acube_api_url" class="col-lg-9"/>
+                        </div>
+                        <div class="row mt8">
+                            <label for="acube_api_key" class="col-lg-3"/>
+                            <field name="acube_api_key" class="col-lg-9"
+                                   password="True"/>
+                        </div>
+                    </setting>
+
+                    <!-- Aruba Ambiente -->
+                    <setting id="foreign_invoice_aruba_env"
+                             string="Ambiente Aruba"
+                             help="Seleziona l'ambiente per l'invio delle fatture tramite Aruba Fatturazione Elettronica Premium.">
+                        <field name="aruba_environment" widget="radio"/>
+                    </setting>
+
+                    <!-- Credenziali Aruba -->
+                    <setting id="foreign_invoice_aruba_credentials"
+                             string="Credenziali Aruba"
+                             help="Inserisci le credenziali per il servizio Aruba Fatturazione Elettronica Premium.">
+                        <div class="row mt16">
+                            <label for="aruba_username" class="col-lg-3"/>
+                            <field name="aruba_username" class="col-lg-9"/>
+                        </div>
+                        <div class="row mt8">
+                            <label for="aruba_password" class="col-lg-3"/>
+                            <field name="aruba_password" class="col-lg-9"
+                                   password="True"/>
+                        </div>
+                    </setting>
+
+                    <!-- Polling SDI -->
+                    <setting id="foreign_invoice_sdi_polling"
+                             string="Polling Automatico SDI"
+                             help="Abilita il controllo automatico delle notifiche SDI tramite cron job.">
+                        <field name="sdi_polling_enabled"/>
+                        <div invisible="not sdi_polling_enabled"
+                             class="mt8">
+                            <label for="sdi_polling_interval"/>
+                            <field name="sdi_polling_interval" class="oe_inline"/>
+                            <span class="ms-1">minuti</span>
+                        </div>
+                    </setting>
+
+                    <!-- Contabilità -->
+                    <setting id="foreign_invoice_journal"
+                             string="Registro Contabile"
+                             help="Registro predefinito per la contabilizzazione delle fatture estere.">
+                        <field name="foreign_invoice_journal_id"/>
+                    </setting>
+
+                </block>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
