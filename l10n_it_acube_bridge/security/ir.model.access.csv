@@ -1,7 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_acube_mixin,acube.mixin.user,model_acube_mixin,account.group_account_invoice,1,0,0,0
-access_acube_import_pdf_wizard,acube.import.pdf.wizard.user,model_acube_import_pdf_wizard,account.group_account_invoice,1,1,1,1
-access_acube_import_pdf_wizard_line,acube.import.pdf.wizard.line.user,model_acube_import_pdf_wizard_line,account.group_account_invoice,1,1,1,1
-access_acube_import_pdf_batch_wizard,acube.import.pdf.batch.wizard.user,model_acube_import_pdf_batch_wizard,account.group_account_invoice,1,1,1,1
-access_acube_import_pdf_batch_file,acube.import.pdf.batch.file.user,model_acube_import_pdf_batch_file,account.group_account_invoice,1,1,1,1
-access_acube_import_pdf_batch_result,acube.import.pdf.batch.result.user,model_acube_import_pdf_batch_result,account.group_account_invoice,1,1,1,1
