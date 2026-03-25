@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ═══ FORM VIEW: Bottoni e Tab SDI ═══ -->
+    <record id="view_move_form_pec_sdi" model="ir.ui.view">
+        <field name="name">account.move.form.pec.sdi</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//header" position="inside">
+                <!-- Invio produzione -->
+                <button name="action_l10n_it_edi_pec_send"
+                        type="object"
+                        string="📤 Invia a SDI"
+                        class="btn-primary"
+                        invisible="not l10n_it_edi_pec_show_send"
+                        groups="l10n_it_edi_pec_bridge.group_sdi_pec_user"/>
+
+                <!-- Simulazione demo -->
+                <button name="action_l10n_it_edi_pec_demo"
+                        type="object"
+                        string="🧪 Simula invio Demo"
+                        class="btn-secondary"
+                        invisible="not l10n_it_edi_pec_show_demo"
+                        groups="l10n_it_edi_pec_bridge.group_sdi_pec_user"/>
+
+                <!-- Validazione -->
+                <button name="action_l10n_it_edi_pec_validate"
+                        type="object"
+                        string="✅ Valida XML"
+                        class="btn-secondary"
+                        invisible="not l10n_it_edi_pec_show_validate"
+                        groups="l10n_it_edi_pec_bridge.group_sdi_pec_user"/>
+
+                <!-- Download XML -->
+                <button name="action_l10n_it_edi_pec_download_xml"
+                        type="object"
+                        string="⬇️ Scarica XML"
+                        class="btn-link"
+                        invisible="not l10n_it_edi_pec_show_download"
+                        groups="l10n_it_edi_pec_bridge.group_sdi_pec_user"/>
+
+                <!-- Retry dopo scarto -->
+                <button name="action_l10n_it_edi_pec_retry"
+                        type="object"
+                        string="🔄 Reinvia a SDI"
+                        class="btn-warning"
+                        invisible="not l10n_it_edi_pec_show_retry"
+                        groups="l10n_it_edi_pec_bridge.group_sdi_pec_user"/>
+
+                <!-- Reset demo -->
+                <button name="action_l10n_it_edi_pec_reset_demo"
+                        type="object"
+                        string="🔄 Resetta stato Demo"
+                        class="btn-link"
+                        invisible="l10n_it_edi_pec_state != 'demo'"
+                        groups="l10n_it_edi_pec_bridge.group_sdi_pec_manager"/>
+            </xpath>
+
+            <!-- Tab Fatturazione Elettronica SDI -->
+            <xpath expr="//page[@name='other_info']" position="after">
+                <page string="Fatturazione Elettronica SDI"
+                      name="sdi_pec"
+                      invisible="country_code != 'IT' or move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund')">
+                    <group>
+                        <group string="Stato SDI">
+                            <field name="l10n_it_edi_pec_state"
+                                   widget="badge"
+                                   decoration-info="l10n_it_edi_pec_state == 'sent'"
+                                   decoration-success="l10n_it_edi_pec_state in ('delivered', 'accepted')"
+                                   decoration-danger="l10n_it_edi_pec_state == 'rejected'"
+                                   decoration-warning="l10n_it_edi_pec_state in ('not_delivered', 'demo')"
+                                   decoration-muted="l10n_it_edi_pec_state in ('to_send', 'validated')"
+                                   readonly="1"/>
+                            <field name="l10n_it_edi_pec_sdi_filename" readonly="1"/>
+                            <field name="l10n_it_edi_pec_sdi_id" readonly="1"/>
+                            <field name="l10n_it_edi_pec_message_id" readonly="1"
+                                   groups="base.group_no_one"/>
+                        </group>
+                        <group string="Errori">
+                            <field name="l10n_it_edi_pec_last_error" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Transazioni SDI">
+                        <field name="l10n_it_edi_pec_transaction_ids" nolabel="1" readonly="1">
+                            <list>
+                                <field name="create_date" string="Data"/>
+                                <field name="transaction_type"/>
+                                <field name="state" widget="badge"
+                                       decoration-success="state in ('delivered', 'accepted')"
+                                       decoration-danger="state in ('rejected', 'error')"
+                                       decoration-info="state == 'sent'"
+                                       decoration-warning="state == 'demo'"/>
+                                <field name="sdi_id"/>
+                                <field name="sdi_filename"/>
+                                <field name="error_message"/>
+                            </list>
+                        </field>
+                    </group>
+                    <!-- Campi computed nascosti per visibilità bottoni -->
+                    <field name="l10n_it_edi_pec_show_send" invisible="1"/>
+                    <field name="l10n_it_edi_pec_show_demo" invisible="1"/>
+                    <field name="l10n_it_edi_pec_show_validate" invisible="1"/>
+                    <field name="l10n_it_edi_pec_show_download" invisible="1"/>
+                    <field name="l10n_it_edi_pec_show_retry" invisible="1"/>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ═══ LIST VIEW: Colonna Stato SDI (fatture clienti) ═══ -->
+    <record id="view_move_tree_pec_sdi" model="ir.ui.view">
+        <field name="name">account.move.list.pec.sdi</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_out_invoice_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="after">
+                <field name="l10n_it_edi_pec_state"
+                       string="Stato SDI"
+                       widget="badge"
+                       optional="show"
+                       decoration-info="l10n_it_edi_pec_state == 'sent'"
+                       decoration-success="l10n_it_edi_pec_state in ('delivered', 'accepted')"
+                       decoration-danger="l10n_it_edi_pec_state == 'rejected'"
+                       decoration-warning="l10n_it_edi_pec_state in ('not_delivered', 'demo')"
+                       decoration-muted="l10n_it_edi_pec_state in ('to_send', 'validated')"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ═══ LIST VIEW: Colonna Stato SDI (fatture fornitori) ═══ -->
+    <record id="view_in_invoice_tree_pec_sdi" model="ir.ui.view">
+        <field name="name">account.move.in.list.pec.sdi</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_in_invoice_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="after">
+                <field name="l10n_it_edi_pec_state"
+                       string="Stato SDI"
+                       widget="badge"
+                       optional="show"
+                       decoration-info="l10n_it_edi_pec_state == 'sent'"
+                       decoration-success="l10n_it_edi_pec_state in ('delivered', 'accepted')"
+                       decoration-danger="l10n_it_edi_pec_state == 'rejected'"
+                       decoration-warning="l10n_it_edi_pec_state in ('not_delivered', 'demo')"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ═══ SEARCH VIEW: Filtri SDI ═══ -->
+    <record id="view_move_search_pec_sdi" model="ir.ui.view">
+        <field name="name">account.move.search.pec.sdi</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_account_invoice_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='late']" position="after">
+                <separator/>
+                <filter string="SDI: Da inviare"
+                        name="sdi_to_send"
+                        domain="[('l10n_it_edi_pec_state', '=', 'to_send')]"/>
+                <filter string="SDI: Inviate (in attesa)"
+                        name="sdi_sent"
+                        domain="[('l10n_it_edi_pec_state', '=', 'sent')]"/>
+                <filter string="SDI: Consegnate"
+                        name="sdi_delivered"
+                        domain="[('l10n_it_edi_pec_state', 'in', ('delivered', 'accepted'))]"/>
+                <filter string="SDI: Scartate"
+                        name="sdi_rejected"
+                        domain="[('l10n_it_edi_pec_state', '=', 'rejected')]"/>
+                <filter string="SDI: Demo"
+                        name="sdi_demo"
+                        domain="[('l10n_it_edi_pec_state', '=', 'demo')]"/>
+                <filter string="SDI: Mancata consegna"
+                        name="sdi_not_delivered"
+                        domain="[('l10n_it_edi_pec_state', '=', 'not_delivered')]"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
