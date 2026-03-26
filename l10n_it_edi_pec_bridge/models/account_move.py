@@ -326,42 +326,63 @@ class AccountMove(models.Model):
             ))
 
     def _get_or_generate_xml(self):
-        """Recupera l'XML già generato da l10n_it_edi o lo genera."""
+        """Recupera l'XML già generato da l10n_it_edi o lo genera.
+
+        In Odoo 18, l10n_it_edi genera l'XML tramite il metodo
+        _l10n_it_edi_render_xml() e lo salva nel campo
+        l10n_it_edi_attachment_file (accessibile via l10n_it_edi_attachment_id).
+        """
         self.ensure_one()
-        # Cerca XML già generato da l10n_it_edi
-        attachment = self.env['ir.attachment'].search([
-            ('res_model', '=', 'account.move'),
-            ('res_id', '=', self.id),
-            ('name', 'like', '%.xml'),
-            ('name', 'not like', 'DEMO_%'),
-            ('name', 'not like', 'VALIDAZIONE_%'),
-        ], limit=1, order='create_date desc')
 
-        if attachment:
-            return base64.b64decode(attachment.datas)
+        # 1. Cerca l'allegato ufficiale generato da l10n_it_edi (Odoo 18)
+        if hasattr(self, 'l10n_it_edi_attachment_id') and self.l10n_it_edi_attachment_id:
+            return self.l10n_it_edi_attachment_id.raw
 
-        # Se non esiste, forza la generazione tramite l10n_it_edi
-        # L'XML viene generato dall'edi format standard di Odoo
-        edi_format = self.env.ref('l10n_it_edi.edi_fatturaPA', raise_if_not_found=False)
-        if edi_format:
-            edi_format._post_fattura_pa(self)
-            # Riprova a trovare l'allegato
-            attachment = self.env['ir.attachment'].search([
-                ('res_model', '=', 'account.move'),
-                ('res_id', '=', self.id),
-                ('name', 'like', '%.xml'),
-                ('name', 'not like', 'DEMO_%'),
-                ('name', 'not like', 'VALIDAZIONE_%'),
-            ], limit=1, order='create_date desc')
-            if attachment:
-                return base64.b64decode(attachment.datas)
+        # 2. Se non esiste, genera l'XML tramite l10n_it_edi
+        if hasattr(self, '_l10n_it_edi_render_xml'):
+            # Verifica prerequisiti
+            if hasattr(self, '_l10n_it_edi_ready_for_xml_export') and not self._l10n_it_edi_ready_for_xml_export():
+                raise UserError(_("La fattura non è pronta per l'esportazione XML. "
+                                  "Verifica che sia confermata e che i dati siano completi."))
+            # Controlla errori di validazione
+            if hasattr(self, '_l10n_it_edi_export_data_check'):
+                errors = self._l10n_it_edi_export_data_check()
+                if errors:
+                    error_msgs = []
+                    for move, move_errors in errors.items():
+                        error_msgs.extend(move_errors)
+                    if error_msgs:
+                        raise UserError(_("Errori nella generazione XML FatturaPA:\n%s") %
+                                        '\n'.join(f"• {e}" for e in error_msgs))
+
+            xml_content = self._l10n_it_edi_render_xml()
+
+            # Salva l'allegato tramite il meccanismo standard di l10n_it_edi
+            attachment_vals = self._l10n_it_edi_get_attachment_values()
+            self.env['ir.attachment'].create(attachment_vals)
+            self.invalidate_recordset(fnames=['l10n_it_edi_attachment_id'])
+
+            return xml_content
 
         raise UserError(_("Impossibile generare l'XML FatturaPA. "
                           "Verifica che il modulo l10n_it_edi sia installato e configurato."))
 
     def _generate_sdi_filename(self):
-        """Genera il nome file conforme SDI: IT{PIVA}_{progressivo}.xml"""
+        """Genera il nome file conforme SDI.
+
+        Usa il metodo ufficiale di l10n_it_edi (Odoo 18) se disponibile,
+        altrimenti genera un nome in formato IT{PIVA}_{progressivo}.xml.
+        """
         self.ensure_one()
+        # Usa il filename ufficiale di l10n_it_edi se già generato
+        if hasattr(self, 'l10n_it_edi_attachment_id') and self.l10n_it_edi_attachment_id:
+            return self.l10n_it_edi_attachment_id.name
+
+        # Usa il generatore di filename di l10n_it_edi (sequenza base-62)
+        if hasattr(self, '_l10n_it_edi_generate_filename'):
+            return self._l10n_it_edi_generate_filename()
+
+        # Fallback manuale
         company = self.company_id
         vat = company.vat
         if vat and vat.startswith('IT'):
@@ -369,7 +390,6 @@ class AccountMove(models.Model):
         elif not vat:
             vat = company.l10n_it_codice_fiscale or '00000000000'
 
-        # Progressivo: conteggio fatture inviate + 1
         count = self.env['sdi.pec.transaction'].search_count([
             ('company_id', '=', company.id),
             ('direction', '=', 'out'),
