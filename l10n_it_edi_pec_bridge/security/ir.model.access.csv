@@ -1,5 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_sdi_pec_transaction_user,sdi.pec.transaction user,model_sdi_pec_transaction,l10n_it_edi_pec_bridge.group_sdi_pec_user,1,0,0,0
-access_sdi_pec_transaction_manager,sdi.pec.transaction manager,model_sdi_pec_transaction,l10n_it_edi_pec_bridge.group_sdi_pec_manager,1,1,1,1
-access_send_wizard_user,send.to.sdi.wizard user,model_l10n_it_edi_send_to_sdi_wizard,l10n_it_edi_pec_bridge.group_sdi_pec_user,1,1,1,0
-access_reset_demo_wizard_manager,reset.demo.wizard manager,model_l10n_it_edi_reset_demo_wizard,l10n_it_edi_pec_bridge.group_sdi_pec_manager,1,1,1,0
