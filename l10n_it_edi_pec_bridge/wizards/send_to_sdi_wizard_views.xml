@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Wizard invio massivo -->
+    <record id="send_to_sdi_wizard_view_form" model="ir.ui.view">
+        <field name="name">l10n_it_edi.send.to.sdi.wizard.form</field>
+        <field name="model">l10n_it_edi.send.to.sdi.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Invio massivo a SDI">
+                <group>
+                    <p class="text-muted">
+                        Stai per inviare <field name="count" nolabel="1" class="oe_inline"/> fatture a SDI.
+                        Modalità: <field name="mode" nolabel="1" class="oe_inline"/>
+                    </p>
+                </group>
+                <footer>
+                    <button name="action_send"
+                            type="object"
+                            string="Invia a SDI"
+                            class="btn-primary"/>
+                    <button string="Annulla" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Wizard gestione demo -->
+    <record id="reset_demo_wizard_view_form" model="ir.ui.view">
+        <field name="name">l10n_it_edi.reset.demo.wizard.form</field>
+        <field name="model">l10n_it_edi.reset.demo.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Gestisci fatture Demo SDI">
+                <group>
+                    <p class="text-muted">
+                        Hai selezionato <field name="move_ids" nolabel="1" class="oe_inline" widget="many2many_tags" readonly="1"/> fatture in stato Demo.
+                        Cosa vuoi fare?
+                    </p>
+                </group>
+                <group>
+                    <field name="action_type" widget="radio"/>
+                </group>
+                <footer>
+                    <button name="action_confirm"
+                            type="object"
+                            string="Conferma"
+                            class="btn-primary"/>
+                    <button string="Annulla" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

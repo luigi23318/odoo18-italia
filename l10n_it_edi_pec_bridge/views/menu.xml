@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="action_sdi_pec_transactions" model="ir.actions.act_window">
+        <field name="name">Transazioni SDI PEC</field>
+        <field name="res_model">sdi.pec.transaction</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_send_to_sdi_wizard" model="ir.actions.act_window">
+        <field name="name">Invio massivo a SDI</field>
+        <field name="res_model">l10n_it_edi.send.to.sdi.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_view_types">list</field>
+    </record>
+
+    <record id="action_reset_demo_wizard" model="ir.actions.act_window">
+        <field name="name">Gestisci fatture Demo SDI</field>
+        <field name="res_model">l10n_it_edi.reset.demo.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menu -->
+    <menuitem id="menu_sdi_pec_root"
+              name="Fatturazione Elettronica"
+              parent="account.menu_finance"
+              sequence="45"/>
+
+    <menuitem id="menu_sdi_pec_transactions"
+              name="Transazioni SDI"
+              parent="menu_sdi_pec_root"
+              action="action_sdi_pec_transactions"
+              sequence="10"/>
+
+    <menuitem id="menu_sdi_pec_reset_demo"
+              name="Gestisci fatture Demo"
+              parent="menu_sdi_pec_root"
+              action="action_reset_demo_wizard"
+              sequence="90"
+              groups="l10n_it_edi_pec_bridge.group_sdi_pec_manager"/>
+
+</odoo>
