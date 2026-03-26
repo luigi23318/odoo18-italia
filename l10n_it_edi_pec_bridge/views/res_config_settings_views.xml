@@ -7,12 +7,11 @@
         <field name="inherit_id" ref="account.res_config_settings_view_form"/>
         <field name="arch" type="xml">
 
-            <!-- Stable Odoo 18 / Aruba compatible hook -->
-            <xpath expr="//sheet" position="inside">
+            <!-- SAFE HOOK: works even when sheet/container changes -->
+            <xpath expr="//div" position="inside">
 
                 <h2 class="mt32">Fatturazione Elettronica PEC</h2>
 
-                <!-- MODE -->
                 <div class="o_setting_box">
                     <div class="o_setting_left_pane"/>
                     <div class="o_setting_right_pane">
@@ -24,7 +23,6 @@
                     </div>
                 </div>
 
-                <!-- PEC + SDI -->
                 <div class="o_setting_box">
                     <div class="o_setting_left_pane"/>
                     <div class="o_setting_right_pane">
@@ -37,7 +35,6 @@
                     </div>
                 </div>
 
-                <!-- MAIL SERVERS -->
                 <div class="o_setting_box">
                     <div class="o_setting_left_pane"/>
                     <div class="o_setting_right_pane">
@@ -49,7 +46,6 @@
                     </div>
                 </div>
 
-                <!-- CLEANUP SETTINGS -->
                 <div class="o_setting_box">
                     <div class="o_setting_left_pane"/>
                     <div class="o_setting_right_pane">
