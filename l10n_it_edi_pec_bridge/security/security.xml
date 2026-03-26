@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Gruppo base: visibilità SDI PEC -->
+        <record id="group_sdi_pec_user" model="res.groups">
+            <field name="name">SDI PEC: Utente</field>
+            <field name="category_id" ref="base.module_category_accounting_accounting"/>
+        </record>
+
+        <!-- Gruppo avanzato: gestione completa SDI PEC -->
+        <record id="group_sdi_pec_manager" model="res.groups">
+            <field name="name">SDI PEC: Amministratore</field>
+            <field name="category_id" ref="base.module_category_accounting_accounting"/>
+            <field name="implied_ids" eval="[(4, ref('l10n_it_edi_pec_bridge.group_sdi_pec_user'))]"/>
+        </record>
+
+        <!-- Chi ha accesso fatturazione ottiene automaticamente SDI PEC User -->
+        <record id="account.group_account_invoice" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('l10n_it_edi_pec_bridge.group_sdi_pec_user'))]"/>
+        </record>
+
+        <!-- Chi è account manager ottiene automaticamente SDI PEC Manager -->
+        <record id="account.group_account_manager" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('l10n_it_edi_pec_bridge.group_sdi_pec_manager'))]"/>
+        </record>
+    </data>
+</odoo>
