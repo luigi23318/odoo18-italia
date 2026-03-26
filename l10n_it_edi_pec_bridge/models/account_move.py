@@ -345,12 +345,16 @@ class AccountMove(models.Model):
                 raise UserError(_("La fattura non è pronta per l'esportazione XML. "
                                   "Verifica che sia confermata e che i dati siano completi."))
             # Controlla errori di validazione
+            # _l10n_it_edi_export_data_check() ritorna un dict dove ogni valore
+            # è un dict con chiavi: 'message', 'action_text' (opz.), 'action' (opz.)
             if hasattr(self, '_l10n_it_edi_export_data_check'):
                 errors = self._l10n_it_edi_export_data_check()
                 if errors:
-                    error_msgs = []
-                    for move, move_errors in errors.items():
-                        error_msgs.extend(move_errors)
+                    error_msgs = [
+                        err_data.get('message', str(err_data))
+                        for err_data in errors.values()
+                        if isinstance(err_data, dict)
+                    ]
                     if error_msgs:
                         raise UserError(_("Errori nella generazione XML FatturaPA:\n%s") %
                                         '\n'.join(f"• {e}" for e in error_msgs))
