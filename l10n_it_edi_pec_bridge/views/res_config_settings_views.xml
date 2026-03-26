@@ -7,8 +7,8 @@
         <field name="inherit_id" ref="account.res_config_settings_view_form"/>
         <field name="arch" type="xml">
 
-            <!-- Odoo 18 safe injection point -->
-            <xpath expr="//div[contains(@class,'o_settings_container')]" position="inside">
+            <!-- Stable Odoo 18 / Aruba compatible hook -->
+            <xpath expr="//sheet" position="inside">
 
                 <h2 class="mt32">Fatturazione Elettronica PEC</h2>
 
@@ -49,7 +49,7 @@
                     </div>
                 </div>
 
-                <!-- CLEANUP -->
+                <!-- CLEANUP SETTINGS -->
                 <div class="o_setting_box">
                     <div class="o_setting_left_pane"/>
                     <div class="o_setting_right_pane">
