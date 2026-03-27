@@ -78,7 +78,8 @@ class AccountMove(models.Model):
     l10n_it_edi_pec_show_download = fields.Boolean(compute='_compute_pec_button_visibility')
     l10n_it_edi_pec_show_retry = fields.Boolean(compute='_compute_pec_button_visibility')
 
-    @api.depends('state', 'move_type', 'country_code', 'l10n_it_edi_pec_state')
+    @api.depends('state', 'move_type', 'country_code', 'l10n_it_edi_pec_state',
+                 'company_id.l10n_it_edi_pec_mode')
     def _compute_pec_button_visibility(self):
         for move in self:
             is_it_out = (
@@ -89,17 +90,20 @@ class AccountMove(models.Model):
             mode = move.company_id.l10n_it_edi_pec_mode
             pec_state = move.l10n_it_edi_pec_state
 
+            # Stati che permettono un (re)invio in qualsiasi modalità
+            sendable_states = (False, 'to_send', 'demo', 'validated')
+
             move.l10n_it_edi_pec_show_send = (
                 is_it_out and mode == 'production'
-                and pec_state in (False, 'to_send')
+                and pec_state in sendable_states
             )
             move.l10n_it_edi_pec_show_demo = (
                 is_it_out and mode == 'demo'
-                and pec_state in (False, 'to_send', 'demo')
+                and pec_state in sendable_states
             )
             move.l10n_it_edi_pec_show_validate = (
                 is_it_out and mode == 'validation'
-                and pec_state in (False, 'to_send', 'validated')
+                and pec_state in sendable_states
             )
             move.l10n_it_edi_pec_show_download = (
                 is_it_out and pec_state in ('validated', 'demo')
