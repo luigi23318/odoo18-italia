@@ -326,67 +326,98 @@ class AccountMove(models.Model):
             ))
 
     def _get_or_generate_xml(self):
-        """Recupera l'XML già generato da l10n_it_edi o lo genera.
-
-        In Odoo 18, l10n_it_edi genera l'XML tramite il metodo
-        _l10n_it_edi_render_xml() e lo salva nel campo
-        l10n_it_edi_attachment_file (accessibile via l10n_it_edi_attachment_id).
-        """
+        """Recupera l'XML già generato da l10n_it_edi o lo genera."""
         self.ensure_one()
+        # 1. Cerca XML già generato da l10n_it_edi (allegato alla fattura)
+        attachment = self.env['ir.attachment'].search([
+            ('res_model', '=', 'account.move'),
+            ('res_id', '=', self.id),
+            ('name', 'like', '%.xml'),
+            ('name', 'not like', 'DEMO_%'),
+            ('name', 'not like', 'VALIDAZIONE_%'),
+        ], limit=1, order='create_date desc')
 
-        # 1. Cerca l'allegato ufficiale generato da l10n_it_edi (Odoo 18)
-        if hasattr(self, 'l10n_it_edi_attachment_id') and self.l10n_it_edi_attachment_id:
-            return self.l10n_it_edi_attachment_id.raw
+        if attachment:
+            return base64.b64decode(attachment.datas)
 
-        # 2. Se non esiste, genera l'XML tramite l10n_it_edi
-        if hasattr(self, '_l10n_it_edi_render_xml'):
-            # Verifica prerequisiti
-            if hasattr(self, '_l10n_it_edi_ready_for_xml_export') and not self._l10n_it_edi_ready_for_xml_export():
-                raise UserError(_("La fattura non è pronta per l'esportazione XML. "
-                                  "Verifica che sia confermata e che i dati siano completi."))
-            # Controlla errori di validazione
-            # _l10n_it_edi_export_data_check() ritorna un dict dove ogni valore
-            # è un dict con chiavi: 'message', 'action_text' (opz.), 'action' (opz.)
-            if hasattr(self, '_l10n_it_edi_export_data_check'):
-                errors = self._l10n_it_edi_export_data_check()
+        # 2. Prova a generare tramite il metodo Odoo 18 l10n_it_edi
+        # In Odoo 18, l'XML viene generato con _l10n_it_edi_export_invoice_as_xml()
+        if hasattr(self, '_l10n_it_edi_export_invoice_as_xml'):
+            result = self._l10n_it_edi_export_invoice_as_xml()
+            # Se il risultato è un dict con 'message', è un errore di configurazione
+            if isinstance(result, dict):
+                errors = []
+                if result.get('message'):
+                    errors.append(str(result['message']))
+                if result.get('error'):
+                    errors.append(str(result['error']))
                 if errors:
-                    error_msgs = [
-                        err_data.get('message', str(err_data))
-                        for err_data in errors.values()
-                        if isinstance(err_data, dict)
-                    ]
-                    if error_msgs:
-                        raise UserError(_("Errori nella generazione XML FatturaPA:\n%s") %
-                                        '\n'.join(f"• {e}" for e in error_msgs))
+                    error_text = '\n'.join(errors)
+                    self.l10n_it_edi_pec_last_error = error_text
+                    raise UserError(_(
+                        "Errori nella generazione XML FatturaPA:\n%s\n\n"
+                        "Verifica i dati azienda (P.IVA, Codice Fiscale, Regime Fiscale) "
+                        "e i dati del cliente (Codice Destinatario o PEC).",
+                        error_text,
+                    ))
+                raise UserError(_("Errore sconosciuto nella generazione XML FatturaPA."))
+            # Se il risultato è bytes o stringa, è l'XML generato
+            if isinstance(result, bytes):
+                xml_content = result
+            elif isinstance(result, str):
+                xml_content = result.encode('utf-8')
+            elif hasattr(result, 'read'):
+                xml_content = result.read()
+            else:
+                # Potrebbe essere un etree Element
+                try:
+                    from lxml import etree as et
+                    xml_content = et.tostring(result, xml_declaration=True, encoding='UTF-8')
+                except Exception:
+                    raise UserError(_("Formato di risposta XML non riconosciuto."))
 
-            xml_content = self._l10n_it_edi_render_xml()
-
-            # Salva l'allegato tramite il meccanismo standard di l10n_it_edi
-            attachment_vals = self._l10n_it_edi_get_attachment_values()
-            self.env['ir.attachment'].create(attachment_vals)
-            self.invalidate_recordset(fnames=['l10n_it_edi_attachment_id'])
-
+            # Salva come allegato
+            filename = self._generate_sdi_filename()
+            self.env['ir.attachment'].create({
+                'name': filename,
+                'datas': base64.b64encode(xml_content),
+                'res_model': 'account.move',
+                'res_id': self.id,
+                'mimetype': 'application/xml',
+            })
             return xml_content
 
-        raise UserError(_("Impossibile generare l'XML FatturaPA. "
-                          "Verifica che il modulo l10n_it_edi sia installato e configurato."))
+        # 3. Fallback: prova il metodo generico di generazione EDI di Odoo 18
+        # In Odoo 18 la generazione può passare anche per _generate_xml_attachment()
+        for method_name in ('_l10n_it_edi_generate_electronic_invoice_xml',
+                            '_generate_fattura_pa_xml',
+                            'l10n_it_edi_export_invoice_as_xml'):
+            if hasattr(self, method_name):
+                try:
+                    result = getattr(self, method_name)()
+                    if result and not isinstance(result, dict):
+                        if isinstance(result, bytes):
+                            return result
+                        elif isinstance(result, str):
+                            return result.encode('utf-8')
+                except Exception as e:
+                    _logger.warning("Metodo %s fallito: %s", method_name, e)
+
+        raise UserError(_(
+            "Impossibile generare l'XML FatturaPA.\n\n"
+            "Assicurati di:\n"
+            "• Avere il modulo l10n_it_edi installato e configurato\n"
+            "• Avere configurato P.IVA e Codice Fiscale dell'azienda\n"
+            "• Avere configurato il Regime Fiscale nelle impostazioni\n"
+            "• Avere compilato i dati del cliente (Codice Destinatario o PEC)\n\n"
+            "In alternativa, genera prima l'XML dalla fattura usando "
+            "il pulsante 'Invia' standard di Odoo (selezionando solo 'Genera file XML'), "
+            "poi riprova."
+        ))
 
     def _generate_sdi_filename(self):
-        """Genera il nome file conforme SDI.
-
-        Usa il metodo ufficiale di l10n_it_edi (Odoo 18) se disponibile,
-        altrimenti genera un nome in formato IT{PIVA}_{progressivo}.xml.
-        """
+        """Genera il nome file conforme SDI: IT{PIVA}_{progressivo}.xml"""
         self.ensure_one()
-        # Usa il filename ufficiale di l10n_it_edi se già generato
-        if hasattr(self, 'l10n_it_edi_attachment_id') and self.l10n_it_edi_attachment_id:
-            return self.l10n_it_edi_attachment_id.name
-
-        # Usa il generatore di filename di l10n_it_edi (sequenza base-62)
-        if hasattr(self, '_l10n_it_edi_generate_filename'):
-            return self._l10n_it_edi_generate_filename()
-
-        # Fallback manuale
         company = self.company_id
         vat = company.vat
         if vat and vat.startswith('IT'):
@@ -394,6 +425,7 @@ class AccountMove(models.Model):
         elif not vat:
             vat = company.l10n_it_codice_fiscale or '00000000000'
 
+        # Progressivo: conteggio fatture inviate + 1
         count = self.env['sdi.pec.transaction'].search_count([
             ('company_id', '=', company.id),
             ('direction', '=', 'out'),
@@ -411,22 +443,45 @@ class AccountMove(models.Model):
         except etree.XMLSyntaxError as e:
             return [_("XML malformato: %s") % str(e)]
 
-        # Controlla namespace
-        if NS_FPA not in root.nsmap.values() and NS_FPA not in (root.tag or ''):
-            errors.append(_("Namespace FatturaPA non trovato nell'XML"))
+        # L'XML di Odoo 18 può usare diversi formati di namespace:
+        # - con prefisso: <p:FatturaElettronica xmlns:p="http://...">
+        # - default ns: <FatturaElettronica xmlns="http://...">
+        # - senza ns: <FatturaElettronica>
+        # Strategia: cerca l'elemento con qualsiasi approccio
 
-        # Controlla campi obbligatori base
-        ns = {'p': NS_FPA}
-        checks = [
-            ('.//p:DatiTrasmissione', 'DatiTrasmissione'),
-            ('.//p:CedentePrestatore', 'CedentePrestatore'),
-            ('.//p:CessionarioCommittente', 'CessionarioCommittente'),
-            ('.//p:DatiGeneraliDocumento', 'DatiGeneraliDocumento'),
+        required_elements = [
+            'DatiTrasmissione',
+            'CedentePrestatore',
+            'CessionarioCommittente',
+            'DatiGeneraliDocumento',
         ]
-        for xpath, name in checks:
-            if root.find(xpath, ns) is None:
-                # Prova senza namespace (alcuni generatori non usano prefisso)
-                if root.find(f'.//{{{NS_FPA}}}{name}') is None:
-                    errors.append(_("Sezione obbligatoria mancante: %s") % name)
+
+        for name in required_elements:
+            found = False
+
+            # Metodo 1: ricerca con namespace esplicito
+            if root.find(f'.//{{{NS_FPA}}}{name}') is not None:
+                found = True
+
+            # Metodo 2: ricerca con tutti i namespace del documento
+            if not found:
+                for ns_uri in root.nsmap.values():
+                    if root.find(f'.//{{{ns_uri}}}{name}') is not None:
+                        found = True
+                        break
+
+            # Metodo 3: ricerca per local-name (ignora namespace)
+            if not found:
+                result = root.xpath(f'.//*[local-name()="{name}"]')
+                if result:
+                    found = True
+
+            # Metodo 4: ricerca senza namespace (XML senza ns)
+            if not found:
+                if root.find(f'.//{name}') is not None:
+                    found = True
+
+            if not found:
+                errors.append(_("Sezione obbligatoria mancante: %s") % name)
 
         return errors
