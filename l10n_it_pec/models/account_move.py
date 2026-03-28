@@ -67,7 +67,7 @@ class AccountMove(models.Model):
         self.ensure_one()
         return self.company_id.l10n_it_edi_pec_mode in ('demo', 'test', 'production')
 
-    def _l10n_it_edi_send(self):
+    def _l10n_it_edi_send(self, attachments_vals):
         """
         Override CHIAVE — Opzione C.
 
@@ -81,14 +81,20 @@ class AccountMove(models.Model):
         pec_moves = self.filtered(lambda m: m._l10n_it_edi_pec_is_active())
         standard_moves = self - pec_moves
 
+        results = {}
+
         # Fatture che usano il canale standard
         if standard_moves:
-            super(AccountMove, standard_moves)._l10n_it_edi_send()
+            standard_attachments = {m: v for m, v in attachments_vals.items() if m in standard_moves}
+            results.update(super(AccountMove, standard_moves)._l10n_it_edi_send(standard_attachments))
 
         # Fatture che usano il canale PEC
         for move in pec_moves:
+            attachment = attachments_vals.get(move, {})
+            filename = attachment.get('name', '')
             try:
                 move._l10n_it_pec_send_to_sdi()
+                results[filename] = {}
             except Exception as e:
                 _logger.exception(
                     "Errore invio PEC fattura %s: %s", move.name, str(e)
@@ -99,6 +105,9 @@ class AccountMove(models.Model):
                     message_type='notification',
                     subtype_xmlid='mail.mt_note',
                 )
+                results[filename] = {'error_message': str(e)}
+
+        return results
 
     # ══════════════════════════════════════════════════════════════════
     #  Generazione XML e invio PEC
