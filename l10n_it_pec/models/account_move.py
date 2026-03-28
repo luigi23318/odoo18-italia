@@ -196,7 +196,7 @@ class AccountMove(models.Model):
         # Costruzione email PEC
         msg = EmailMessage()
         msg['Subject'] = filename  # SDI richiede il nome file come subject
-        msg['From'] = company.l10n_it_pec_email
+        msg['From'] = company.l10n_it_pec_email or company.l10n_it_pec_smtp_user
         msg['To'] = destination
         msg.set_content(
             f"Invio fattura elettronica {self.name} — "
