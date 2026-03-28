@@ -47,12 +47,12 @@ class PecSendWizard(models.TransientModel):
                 lambda m: (
                     m.state == 'posted'
                     and m.move_type in ('out_invoice', 'out_refund')
-                    and m.l10n_it_edi_state != 'delivered'
+                    and m.l10n_it_edi_state != 'forwarded'
                 )
             )
             wiz.count_sendable = len(sendable)
             wiz.count_already_sent = len(
-                wiz.move_ids.filtered(lambda m: m.l10n_it_edi_state == 'delivered')
+                wiz.move_ids.filtered(lambda m: m.l10n_it_edi_state == 'forwarded')
             )
 
     @api.model
@@ -81,7 +81,7 @@ class PecSendWizard(models.TransientModel):
             lambda m: (
                 m.state == 'posted'
                 and m.move_type in ('out_invoice', 'out_refund')
-                and m.l10n_it_edi_state not in ('delivered',)
+                and m.l10n_it_edi_state not in ('forwarded',)
             )
         )
 
