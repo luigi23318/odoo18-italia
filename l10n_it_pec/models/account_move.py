@@ -69,8 +69,8 @@ class AccountMove(models.Model):
     def action_check_l10n_it_edi(self):
         """Override: per fatture inviate via PEC, controlla via IMAP invece del proxy SDI."""
         self.ensure_one()
-        # Se la fattura è stata inviata via PEC (ha message_id ma non transaction)
-        if self.l10n_it_pec_message_id and not self.l10n_it_edi_transaction:
+        # Se modalità PEC attiva e non c'è transaction (proxy SDI), controlla via IMAP
+        if self._l10n_it_edi_pec_is_active() and not self.l10n_it_edi_transaction:
             return self._l10n_it_pec_check_notifications()
         return super().action_check_l10n_it_edi()
 
