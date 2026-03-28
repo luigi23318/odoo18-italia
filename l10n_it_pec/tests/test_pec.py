@@ -139,52 +139,52 @@ class TestPecAccountMove(TransactionCase):
     def test_13_notification_rc(self):
         """Notifica RC (Ricevuta Consegna) aggiorna stato a delivered."""
         invoice = self._create_test_invoice()
-        invoice.l10n_it_edi_state = 'sent'
+        invoice.l10n_it_edi_state = 'processing'
 
         xml_rc = b'<NotificaRC><NomeFile>test.xml</NomeFile></NotificaRC>'
         invoice._l10n_it_pec_process_sdi_notification('RC', xml_rc)
 
-        self.assertEqual(invoice.l10n_it_edi_state, 'delivered')
+        self.assertEqual(invoice.l10n_it_edi_state, 'forwarded')
 
     def test_14_notification_ns(self):
         """Notifica NS (Scarto) aggiorna stato a invalid."""
         invoice = self._create_test_invoice()
-        invoice.l10n_it_edi_state = 'sent'
+        invoice.l10n_it_edi_state = 'processing'
 
         xml_ns = b'<NotificaNS><NomeFile>test.xml</NomeFile></NotificaNS>'
         invoice._l10n_it_pec_process_sdi_notification('NS', xml_ns)
 
-        self.assertEqual(invoice.l10n_it_edi_state, 'invalid')
+        self.assertEqual(invoice.l10n_it_edi_state, 'rejected')
 
     def test_15_notification_ne_accepted(self):
         """Notifica NE con EC01 (Accettazione) → delivered."""
         invoice = self._create_test_invoice()
-        invoice.l10n_it_edi_state = 'sent'
+        invoice.l10n_it_edi_state = 'processing'
 
         xml_ne = b'<NotificaNE><Esito>EC01</Esito></NotificaNE>'
         invoice._l10n_it_pec_process_sdi_notification('NE', xml_ne)
 
-        self.assertEqual(invoice.l10n_it_edi_state, 'delivered')
+        self.assertEqual(invoice.l10n_it_edi_state, 'forwarded')
 
     def test_16_notification_ne_rejected(self):
         """Notifica NE con EC02 (Rifiuto) → invalid."""
         invoice = self._create_test_invoice()
-        invoice.l10n_it_edi_state = 'sent'
+        invoice.l10n_it_edi_state = 'processing'
 
         xml_ne = b'<NotificaNE><Esito>EC02</Esito></NotificaNE>'
         invoice._l10n_it_pec_process_sdi_notification('NE', xml_ne)
 
-        self.assertEqual(invoice.l10n_it_edi_state, 'invalid')
+        self.assertEqual(invoice.l10n_it_edi_state, 'rejected')
 
     def test_17_notification_dt(self):
         """Notifica DT (Decorrenza Termini = silenzio-assenso) → delivered."""
         invoice = self._create_test_invoice()
-        invoice.l10n_it_edi_state = 'sent'
+        invoice.l10n_it_edi_state = 'processing'
 
         xml_dt = b'<NotificaDT><NomeFile>test.xml</NomeFile></NotificaDT>'
         invoice._l10n_it_pec_process_sdi_notification('DT', xml_dt)
 
-        self.assertEqual(invoice.l10n_it_edi_state, 'delivered')
+        self.assertEqual(invoice.l10n_it_edi_state, 'forwarded')
 
     # ── Helper ────────────────────────────────────────────────────────
 
