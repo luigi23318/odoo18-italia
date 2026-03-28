@@ -107,16 +107,18 @@ class ResCompany(models.Model):
         self.ensure_one()
         if self.l10n_it_edi_pec_mode in ('test', 'production'):
             missing = []
-            if not self.l10n_it_pec_email:
-                missing.append(_("Indirizzo PEC"))
+            if self.l10n_it_edi_pec_mode == 'production':
+                if not self.l10n_it_pec_email:
+                    missing.append(_("Indirizzo PEC"))
             if not self.l10n_it_pec_smtp_server:
                 missing.append(_("Server SMTP PEC"))
             if not self.l10n_it_pec_smtp_user:
                 missing.append(_("Utente SMTP PEC"))
             if not self.l10n_it_pec_smtp_password:
                 missing.append(_("Password SMTP PEC"))
-            if not self.l10n_it_pec_sdi_address:
-                missing.append(_("Indirizzo PEC SDI"))
+            if self.l10n_it_edi_pec_mode == 'production':
+                if not self.l10n_it_pec_sdi_address:
+                    missing.append(_("Indirizzo PEC SDI"))
             if missing:
                 raise ValidationError(
                     _("Configurazione PEC incompleta. Campi mancanti:\n%s")
