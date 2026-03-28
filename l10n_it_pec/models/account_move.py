@@ -2,7 +2,6 @@
 # Copyright 2026 OdooManager.cloud
 # License LGPL-3.0 or later (https://www.gnu.org/licenses/lgpl-3.0).
 
-import base64
 import logging
 import re
 import smtplib
@@ -92,8 +91,9 @@ class AccountMove(models.Model):
         for move in pec_moves:
             attachment = attachments_vals.get(move, {})
             filename = attachment.get('name', '')
+            xml_content = attachment.get('raw', b'')
             try:
-                move._l10n_it_pec_send_to_sdi()
+                move._l10n_it_pec_send_to_sdi(xml_content, filename)
                 results[filename] = {}
             except Exception as e:
                 _logger.exception(
@@ -118,89 +118,18 @@ class AccountMove(models.Model):
         Genera l'XML FatturaPA riutilizzando il motore standard di l10n_it_edi.
         Salva l'XML come allegato sulla fattura.
 
-        Compatibilità: prova diversi nomi di metodo usati nelle varie
-        versioni di Odoo 18 CE per la generazione XML FatturaPA.
+        Usa _l10n_it_edi_render_xml() e _l10n_it_edi_generate_filename()
+        definiti in l10n_it_edi/models/account_move.py.
         """
         self.ensure_one()
 
-        xml_content = None
-        errors = []
-
-        # Strategia 1: metodo diretto Odoo 18 (più recente)
-        if hasattr(self, '_l10n_it_edi_export_invoice_as_xml'):
-            try:
-                result = self._l10n_it_edi_export_invoice_as_xml()
-                if isinstance(result, tuple):
-                    xml_content, errors = result
-                else:
-                    xml_content = result
-            except Exception as e:
-                _logger.warning(
-                    "_l10n_it_edi_export_invoice_as_xml fallito: %s", e
-                )
-
-        # Strategia 2: via l10n_it_edi_content field (computed)
-        if not xml_content and hasattr(self, 'l10n_it_edi_content'):
-            try:
-                content = self.l10n_it_edi_content
-                if content:
-                    xml_content = base64.b64decode(content) if isinstance(content, str) else content
-            except Exception as e:
-                _logger.warning(
-                    "l10n_it_edi_content fallito: %s", e
-                )
-
-        # Strategia 3: via account.edi.xml.cii (se disponibile)
-        if not xml_content:
-            try:
-                builder = self.env.get('account.edi.xml.it_fatturapa')
-                if builder:
-                    xml_content = builder._export_invoice(self)
-            except Exception as e:
-                _logger.warning(
-                    "account.edi.xml.it_fatturapa fallito: %s", e
-                )
-
-        # Strategia 4: via il vecchio account.edi.format
-        if not xml_content:
-            try:
-                edi_format = self.env.ref('l10n_it_edi.edi_format_it', raise_if_not_found=False)
-                if edi_format:
-                    result = edi_format._export_invoice(self)
-                    if isinstance(result, tuple):
-                        xml_content = result[0]
-                    else:
-                        xml_content = result
-            except Exception as e:
-                _logger.warning(
-                    "account.edi.format._export_invoice fallito: %s", e
-                )
-
-        if not xml_content:
-            raise UserError(
-                _("Impossibile generare l'XML FatturaPA. "
-                  "Nessun metodo di esportazione disponibile.\n"
-                  "Verificare che il modulo l10n_it_edi sia installato "
-                  "e la fattura sia correttamente configurata.")
-            )
-
-        if errors:
-            raise UserError(
-                _("Errori nella generazione XML FatturaPA:\n%s")
-                % '\n'.join(str(e) for e in errors)
-            )
-
-        # Nome file secondo specifiche SDI:
-        # IT + PartitaIVA + _ + progressivo univoco
-        vat = (self.company_id.vat or '').replace(' ', '')
-        if vat.startswith('IT'):
-            vat = vat[2:]
-        filename = f"IT{vat}_{self.name.replace('/', '_')}.xml"
+        xml_content = self._l10n_it_edi_render_xml()
+        filename = self._l10n_it_edi_generate_filename()
 
         # Salva come allegato
         attachment = self.env['ir.attachment'].create({
             'name': filename,
-            'raw': xml_content if isinstance(xml_content, bytes) else xml_content.encode('utf-8'),
+            'raw': xml_content,
             'res_model': 'account.move',
             'res_id': self.id,
             'mimetype': 'application/xml',
@@ -209,16 +138,32 @@ class AccountMove(models.Model):
 
         return xml_content, filename
 
-    def _l10n_it_pec_send_to_sdi(self):
+    def _l10n_it_pec_send_to_sdi(self, xml_content=None, filename=None):
         """
         Invia la fattura allo SDI via PEC.
         In modalità demo, logga senza inviare.
+
+        :param xml_content: XML FatturaPA già generato dal flusso standard.
+                            Se None, genera tramite _l10n_it_pec_generate_xml().
+        :param filename: nome file XML. Se None, viene generato.
         """
         self.ensure_one()
         company = self.company_id
 
-        # Genera XML
-        xml_content, filename = self._l10n_it_pec_generate_xml()
+        # Usa l'XML dal flusso standard, oppure genera come fallback
+        if xml_content is None or not filename:
+            xml_content, filename = self._l10n_it_pec_generate_xml()
+        else:
+            # Salva l'XML come allegato sulla fattura
+            xml_bytes = xml_content if isinstance(xml_content, bytes) else xml_content.encode('utf-8')
+            attachment = self.env['ir.attachment'].create({
+                'name': filename,
+                'raw': xml_bytes,
+                'res_model': 'account.move',
+                'res_id': self.id,
+                'mimetype': 'application/xml',
+            })
+            self.l10n_it_pec_xml_attachment_id = attachment
 
         mode = company.l10n_it_edi_pec_mode
 
