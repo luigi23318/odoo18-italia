@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Cron: Polling inbox PEC per notifiche SDI e fatture passive -->
+    <record id="cron_poll_pec_inbox" model="ir.cron">
+        <field name="name">PEC SDI: Controlla inbox PEC</field>
+        <field name="model_id" ref="model_l10n_it_pec_mail_handler"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_poll_pec_inbox()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+        <field name="doall" eval="False"/>
+        <field name="priority">100</field>
+    </record>
+</odoo>

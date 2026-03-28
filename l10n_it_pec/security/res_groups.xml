@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_pec_manager" model="res.groups">
+        <field name="name">Gestore PEC SDI</field>
+        <field name="category_id" ref="base.module_category_accounting_accounting"/>
+        <field name="comment">
+            Permette la gestione dell'invio fatture via PEC allo SDI
+            e la configurazione dei parametri PEC.
+        </field>
+    </record>
+</odoo>
