@@ -66,6 +66,40 @@ class AccountMove(models.Model):
         self.ensure_one()
         return self.company_id.l10n_it_edi_pec_mode in ('demo', 'test', 'production')
 
+    def action_check_l10n_it_edi(self):
+        """Override: per fatture inviate via PEC, controlla via IMAP invece del proxy SDI."""
+        self.ensure_one()
+        # Se la fattura è stata inviata via PEC (ha message_id ma non transaction)
+        if self.l10n_it_pec_message_id and not self.l10n_it_edi_transaction:
+            return self._l10n_it_pec_check_notifications()
+        return super().action_check_l10n_it_edi()
+
+    def _l10n_it_pec_check_notifications(self):
+        """Controlla via IMAP se ci sono notifiche SDI per questa fattura."""
+        self.ensure_one()
+        company = self.company_id
+        handler = self.env['l10n_it_pec.mail.handler']
+        old_state = self.l10n_it_edi_state
+        try:
+            handler._poll_company_pec(company)
+        except Exception as e:
+            raise UserError(
+                _("Errore durante il controllo PEC:\n%s") % str(e)
+            )
+        self.invalidate_recordset(fnames=['l10n_it_edi_state'])
+        if self.l10n_it_edi_state != old_state:
+            return {'type': 'ir.actions.client', 'tag': 'reload'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Controllo PEC"),
+                'message': _("Nessuna nuova notifica SDI trovata nella casella PEC."),
+                'type': 'info',
+                'sticky': False,
+            },
+        }
+
     def _l10n_it_edi_send(self, attachments_vals):
         """
         Override CHIAVE — Opzione C.
