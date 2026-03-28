@@ -1,7 +1,0 @@
-<odoo>
-    <record id="edi_format_it_pec" model="account.edi.format">
-        <field name="name">FatturaPA PEC</field>
-        <field name="code">it_edi_pec</field>
-        <field name="country_id" ref="base.it"/>
-    </record>
-</odoo>
