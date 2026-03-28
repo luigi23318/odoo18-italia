@@ -13,19 +13,19 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 # Mapping notifiche SDI → stato l10n_it_edi nativo Odoo 18
-# RC  = Ricevuta di Consegna         → delivered (accettata)
-# NS  = Notifica di Scarto           → invalid (XML non valido)
-# MC  = Mancata Consegna             → awaiting (in attesa retry)
-# AT  = Attestazione                  → delivered
-# NE  = Notifica Esito (accettata)   → delivered
-# NE  = Notifica Esito (rifiutata)   → invalid
-# DT  = Decorrenza Termini           → delivered (silenzio-assenso)
+# RC  = Ricevuta di Consegna         → forwarded (accettata e consegnata)
+# NS  = Notifica di Scarto           → rejected (XML non valido)
+# MC  = Mancata Consegna             → forward_attempt (in attesa retry)
+# AT  = Attestazione                  → forwarded
+# NE  = Notifica Esito (accettata)   → forwarded
+# NE  = Notifica Esito (rifiutata)   → rejected
+# DT  = Decorrenza Termini           → forwarded (silenzio-assenso)
 SDI_NOTIFICATION_MAP = {
-    'RC': 'delivered',
-    'NS': 'invalid',
-    'MC': 'awaiting',
-    'AT': 'delivered',
-    'DT': 'delivered',
+    'RC': 'forwarded',
+    'NS': 'rejected',
+    'MC': 'forward_attempt',
+    'AT': 'forwarded',
+    'DT': 'forwarded',
     # NE dipende dal contenuto (Accettazione/Rifiuto)
 }
 
@@ -246,7 +246,7 @@ class AccountMove(models.Model):
         self.l10n_it_pec_last_error = False
 
         # Aggiorna stato EDI standard
-        self.l10n_it_edi_state = 'sent'
+        self.l10n_it_edi_state = 'processing'
 
         env_label = _("TEST") if mode == 'test' else _("PRODUZIONE")
         self.message_post(
@@ -382,10 +382,10 @@ class AccountMove(models.Model):
             # Cerca il tag Esito nel XML della notifica
             # EC01 = Accettazione, EC02 = Rifiuto
             if 'EC01' in content:
-                return 'delivered'
+                return 'forwarded'
             elif 'EC02' in content:
-                return 'invalid'
+                return 'rejected'
         except Exception:
             _logger.warning("Impossibile parsificare Notifica Esito per %s", self.name)
 
-        return 'delivered'  # default safe: silenzio-assenso
+        return 'forwarded'  # default safe: silenzio-assenso
