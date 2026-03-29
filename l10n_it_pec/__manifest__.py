@@ -29,7 +29,7 @@ Funzionalità:
 - Dry-run mode per test senza invio reale
     """,
     'author': 'OdooManager.cloud',
-    'website': 'https://odooomanager.cloud',
+    'website': 'https://odoomanager.cloud',
     'license': 'LGPL-3',
     'depends': [
         'account',
