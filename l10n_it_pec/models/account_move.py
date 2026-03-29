@@ -3,8 +3,8 @@
 # License LGPL-3.0 or later (https://www.gnu.org/licenses/lgpl-3.0).
 
 import logging
-import re
 import smtplib
+from base64 import b64decode
 from email.message import EmailMessage
 
 from odoo import api, fields, models, _
@@ -81,11 +81,16 @@ class AccountMove(models.Model):
         self.ensure_one()
         return self.company_id.l10n_it_edi_pec_mode in ('demo', 'test', 'production')
 
+    def _l10n_it_pec_is_pec_transaction(self):
+        """Verifica se la transaction corrente è stata generata dall'invio PEC."""
+        self.ensure_one()
+        t = self.l10n_it_edi_transaction or ''
+        return t.startswith(('<', 'pec_', 'demo'))
+
     def action_check_l10n_it_edi(self):
         """Override: per fatture inviate via PEC, controlla via IMAP invece del proxy SDI."""
         self.ensure_one()
-        # Se modalità PEC attiva e non c'è transaction (proxy SDI), controlla via IMAP
-        if self._l10n_it_edi_pec_is_active() and not self.l10n_it_edi_transaction:
+        if self._l10n_it_edi_pec_is_active() and self._l10n_it_pec_is_pec_transaction():
             return self._l10n_it_pec_check_notifications()
         return super().action_check_l10n_it_edi()
 
@@ -115,47 +120,37 @@ class AccountMove(models.Model):
             },
         }
 
-    def _l10n_it_edi_send(self, attachments_vals):
+    def _l10n_it_edi_upload(self, files):
         """
-        Override CHIAVE — Opzione C.
+        Override del trasporto EDI — Opzione C.
 
-        Odoo 18 chiama questo metodo per inviare la fattura allo SDI.
-        Se la modalità PEC è attiva, intercettiamo e usiamo il trasporto PEC.
-        Altrimenti, passiamo al flusso standard (proxy Odoo).
+        Se la modalità PEC è attiva, invia via SMTP/PEC invece del proxy Odoo.
+        Altrimenti, passa al flusso standard.
 
-        L'XML viene generato dal motore standard _l10n_it_edi_export_invoice_as_xml(),
-        noi cambiamo SOLO il trasporto.
+        Ritorna lo stesso formato dello standard:
+        - Successo: {filename: {'id_transaction': '...'}}
+        - Errore:   {filename: {'error': '...', 'error_description': '...'}}
+
+        Il chiamante _l10n_it_edi_send() gestisce autonomamente:
+        stato, transaction, header, messaggi chatter.
         """
-        pec_moves = self.filtered(lambda m: m._l10n_it_edi_pec_is_active())
-        standard_moves = self - pec_moves
+        if not self._l10n_it_edi_pec_is_active():
+            return super()._l10n_it_edi_upload(files)
 
         results = {}
-
-        # Fatture che usano il canale standard
-        if standard_moves:
-            standard_attachments = {m: v for m, v in attachments_vals.items() if m in standard_moves}
-            results.update(super(AccountMove, standard_moves)._l10n_it_edi_send(standard_attachments))
-
-        # Fatture che usano il canale PEC
-        for move in pec_moves:
-            attachment = attachments_vals.get(move, {})
-            filename = attachment.get('name', '')
-            xml_content = attachment.get('raw', b'')
+        for file_data in (files or []):
+            filename = file_data['filename']
             try:
-                move._l10n_it_pec_send_to_sdi(xml_content, filename)
-                results[filename] = {}
+                self._l10n_it_pec_send_to_sdi(file_data)
+                message_id = self.l10n_it_pec_message_id or 'pec_%s' % self.id
+                results[filename] = {'id_transaction': message_id}
             except Exception as e:
-                _logger.exception(
-                    "Errore invio PEC fattura %s: %s", move.name, str(e)
-                )
-                move.l10n_it_pec_last_error = str(e)
-                move.message_post(
-                    body=_("❌ Errore invio PEC allo SDI: %s") % str(e),
-                    message_type='notification',
-                    subtype_xmlid='mail.mt_note',
-                )
-                results[filename] = {'error_message': str(e)}
-
+                _logger.exception("Errore invio PEC fattura %s: %s", self.name, str(e))
+                self.l10n_it_pec_last_error = str(e)
+                results[filename] = {
+                    'error': 'PEC_SEND',
+                    'error_description': str(e),
+                }
         return results
 
     # ══════════════════════════════════════════════════════════════════
@@ -187,73 +182,54 @@ class AccountMove(models.Model):
 
         return xml_content, filename
 
-    def _l10n_it_pec_send_to_sdi(self, xml_content=None, filename=None):
+    def _l10n_it_pec_send_to_sdi(self, file_data):
         """
         Invia la fattura allo SDI via PEC.
         In modalità demo, logga senza inviare.
 
-        :param xml_content: XML FatturaPA già generato dal flusso standard.
-                            Se None, genera tramite _l10n_it_pec_generate_xml().
-        :param filename: nome file XML. Se None, viene generato.
+        :param file_data: dict con 'filename' e 'xml' (base64) dal flusso standard.
         """
         self.ensure_one()
         company = self.company_id
-
-        # Usa l'XML dal flusso standard, oppure genera come fallback
-        if xml_content is None or not filename:
-            xml_content, filename = self._l10n_it_pec_generate_xml()
-        else:
-            # Salva l'XML come allegato sulla fattura
-            xml_bytes = xml_content if isinstance(xml_content, bytes) else xml_content.encode('utf-8')
-            attachment = self.env['ir.attachment'].create({
-                'name': filename,
-                'raw': xml_bytes,
-                'res_model': 'account.move',
-                'res_id': self.id,
-                'mimetype': 'application/xml',
-            })
-            self.l10n_it_pec_xml_attachment_id = attachment
-
+        filename = file_data['filename']
+        xml_bytes = b64decode(file_data['xml'])
         mode = company.l10n_it_edi_pec_mode
 
-        # ── DEMO MODE: dry-run ────────────────────────────────────────
+        # Salva l'XML come allegato PEC sulla fattura
+        attachment = self.env['ir.attachment'].create({
+            'name': filename,
+            'raw': xml_bytes,
+            'res_model': 'account.move',
+            'res_id': self.id,
+            'mimetype': 'application/xml',
+        })
+        self.l10n_it_pec_xml_attachment_id = attachment
+
+        # ── DEMO MODE: dry-run (lo standard usa id_transaction='demo') ──
         if mode == 'demo':
             _logger.info(
                 "[PEC DEMO] Fattura %s — XML generato (%d bytes), "
                 "filename: %s — Nessun invio reale.",
-                self.name, len(xml_content), filename,
+                self.name, len(xml_bytes), filename,
             )
             self.l10n_it_pec_sent_date = fields.Datetime.now()
+            self.l10n_it_pec_message_id = 'demo'
             self.l10n_it_pec_last_error = False
-            self.message_post(
-                body=_(
-                    "🔵 <b>DEMO</b>: XML FatturaPA generato con successo "
-                    "(<code>%s</code>, %d bytes). Nessun invio reale effettuato."
-                ) % (filename, len(xml_content)),
-                message_type='notification',
-                subtype_xmlid='mail.mt_note',
-                attachment_ids=[self.l10n_it_pec_xml_attachment_id.id],
-            )
-            # In demo NON cambiamo lo stato EDI standard
             return
 
         # ── INVIO REALE (test / production) ───────────────────────────
         company._check_pec_configuration()
-
         destination = company._get_pec_sdi_destination()
 
         # Costruzione email PEC
         msg = EmailMessage()
-        msg['Subject'] = filename  # SDI richiede il nome file come subject
+        msg['Subject'] = filename
         msg['From'] = company.l10n_it_pec_email or company.l10n_it_pec_smtp_user
         msg['To'] = destination
         msg.set_content(
             f"Invio fattura elettronica {self.name} — "
             f"Modalità: {mode}"
         )
-
-        # Allegato XML
-        xml_bytes = xml_content if isinstance(xml_content, bytes) else xml_content.encode('utf-8')
         msg.add_attachment(
             xml_bytes,
             maintype='application',
@@ -262,60 +238,39 @@ class AccountMove(models.Model):
         )
 
         # Invio SMTP
-        try:
-            if company.l10n_it_pec_smtp_security == 'ssl':
-                smtp = smtplib.SMTP_SSL(
-                    company.l10n_it_pec_smtp_server,
-                    company.l10n_it_pec_smtp_port,
-                    timeout=30,
-                )
-            else:
-                smtp = smtplib.SMTP(
-                    company.l10n_it_pec_smtp_server,
-                    company.l10n_it_pec_smtp_port,
-                    timeout=30,
-                )
-                smtp.starttls()
-
-            smtp.login(
-                company.l10n_it_pec_smtp_user,
-                company.l10n_it_pec_smtp_password,
+        if company.l10n_it_pec_smtp_security == 'ssl':
+            smtp = smtplib.SMTP_SSL(
+                company.l10n_it_pec_smtp_server,
+                company.l10n_it_pec_smtp_port,
+                timeout=30,
             )
-            smtp.send_message(msg)
-            smtp.quit()
-
-        except smtplib.SMTPException as e:
-            raise UserError(
-                _("Errore SMTP durante l'invio PEC:\n%s") % str(e)
+        else:
+            smtp = smtplib.SMTP(
+                company.l10n_it_pec_smtp_server,
+                company.l10n_it_pec_smtp_port,
+                timeout=30,
             )
+            smtp.starttls()
 
-        # Aggiorna record
+        smtp.login(
+            company.l10n_it_pec_smtp_user,
+            company.l10n_it_pec_smtp_password,
+        )
+        smtp.send_message(msg)
+        smtp.quit()
+
+        # Aggiorna solo i campi PEC informativi.
+        # Stato EDI, transaction, header, chatter → gestiti dallo standard.
         self.l10n_it_pec_sent_date = fields.Datetime.now()
         self.l10n_it_pec_message_id = msg.get('Message-ID', '')
         self.l10n_it_pec_last_error = False
-
-        # Lo stato EDI (processing) viene gestito dal flusso standard Odoo
-        # tramite _l10n_it_edi_send() — non lo settiamo qui.
-
-        env_label = _("TEST") if mode == 'test' else _("PRODUZIONE")
-        self.message_post(
-            body=_(
-                "✅ Fattura inviata via PEC allo SDI [%s]\n"
-                "Destinatario: <code>%s</code>\n"
-                "File: <code>%s</code>\n"
-                "Message-ID: <code>%s</code>"
-            ) % (env_label, destination, filename, self.l10n_it_pec_message_id),
-            message_type='notification',
-            subtype_xmlid='mail.mt_note',
-            attachment_ids=[self.l10n_it_pec_xml_attachment_id.id],
-        )
 
     # ══════════════════════════════════════════════════════════════════
     #  Azione manuale: Invia via PEC (bottone nella vista fattura)
     # ══════════════════════════════════════════════════════════════════
 
     def action_l10n_it_pec_send(self):
-        """Azione bottone: invia la fattura via PEC allo SDI."""
+        """Azione bottone: invia la fattura via PEC allo SDI tramite il flusso standard."""
         self.ensure_one()
         if self.state != 'posted':
             raise UserError(_("La fattura deve essere confermata prima dell'invio."))
@@ -324,7 +279,10 @@ class AccountMove(models.Model):
                 _("La modalità PEC non è attiva. "
                   "Configurare in Impostazioni → Contabilità → PEC SDI.")
             )
-        self._l10n_it_pec_send_to_sdi()
+        # Genera XML e passa al flusso standard _l10n_it_edi_send
+        # che chiamerà _l10n_it_edi_upload → _l10n_it_pec_send_to_sdi
+        attachment_vals = self._l10n_it_edi_get_attachment_values()
+        self._l10n_it_edi_send({self: attachment_vals})
 
     def action_l10n_it_pec_preview_xml(self):
         """Genera e mostra l'XML senza inviare."""
@@ -361,7 +319,8 @@ class AccountMove(models.Model):
     def _l10n_it_pec_process_sdi_notification(self, notification_type, xml_content, raw_email=None):
         """
         Processa una notifica SDI ricevuta via PEC.
-        Aggiorna lo stato EDI standard (NON uno stato parallelo).
+        Usa _l10n_it_edi_write_send_state() come lo standard Odoo per
+        aggiornare stato, transaction e header in modo coerente.
 
         :param notification_type: tipo notifica SDI (RC, NS, MC, AT, NE, DT)
         :param xml_content: contenuto XML della notifica
@@ -386,12 +345,12 @@ class AccountMove(models.Model):
         else:
             new_state = SDI_NOTIFICATION_MAP.get(notification_type)
 
-        if new_state:
-            self.l10n_it_edi_state = new_state
+        if not new_state:
+            return
 
         # Salva notifica come allegato
         att_name = f"SDI_{notification_type}_{self.name.replace('/', '_')}.xml"
-        attachment = self.env['ir.attachment'].create({
+        self.env['ir.attachment'].create({
             'name': att_name,
             'raw': xml_content if isinstance(xml_content, bytes) else xml_content.encode('utf-8'),
             'res_model': 'account.move',
@@ -399,21 +358,20 @@ class AccountMove(models.Model):
             'mimetype': 'application/xml',
         })
 
-        # Icona per tipo
-        icon_map = {
-            'RC': '✅', 'NS': '❌', 'MC': '⚠️',
-            'AT': '✅', 'NE': '📋', 'DT': '⏰',
-        }
-        icon = icon_map.get(notification_type, 'ℹ️')
+        filename = self.l10n_it_edi_attachment_id.name if self.l10n_it_edi_attachment_id else self.name
+        message = _("SDI notification %(type)s (%(label)s) received for %(file)s.",
+                     type=notification_type, label=label, file=filename)
 
-        self.message_post(
-            body=_(
-                "%s Notifica SDI ricevuta: <b>%s</b>\n"
-                "Nuovo stato: <code>%s</code>"
-            ) % (icon, label, new_state or _('invariato')),
-            message_type='notification',
-            subtype_xmlid='mail.mt_note',
-            attachment_ids=[attachment.id],
+        # Usa il metodo standard per aggiornare stato/transaction/header
+        self._l10n_it_edi_write_send_state(
+            transformed_notification={
+                'l10n_it_edi_state': new_state,
+                'l10n_it_edi_transaction': self.l10n_it_edi_transaction,
+                'send_ack_to_edi_proxy': False,
+                'date': fields.Date.today(),
+                'filename': filename,
+            },
+            message=message,
         )
 
         _logger.info(
