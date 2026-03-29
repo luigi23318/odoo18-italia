@@ -58,6 +58,21 @@ class AccountMove(models.Model):
     )
 
     # ══════════════════════════════════════════════════════════════════
+    #  Reset campi PEC quando si torna in bozza
+    # ══════════════════════════════════════════════════════════════════
+
+    def button_draft(self):
+        """Pulisce i campi PEC quando la fattura torna in bozza."""
+        res = super().button_draft()
+        self.write({
+            'l10n_it_pec_sent_date': False,
+            'l10n_it_pec_message_id': False,
+            'l10n_it_pec_xml_attachment_id': False,
+            'l10n_it_pec_last_error': False,
+        })
+        return res
+
+    # ══════════════════════════════════════════════════════════════════
     #  CUORE OPZIONE C: Intercettazione del trasporto EDI
     # ══════════════════════════════════════════════════════════════════
 
@@ -279,8 +294,8 @@ class AccountMove(models.Model):
         self.l10n_it_pec_message_id = msg.get('Message-ID', '')
         self.l10n_it_pec_last_error = False
 
-        # Aggiorna stato EDI standard
-        self.l10n_it_edi_state = 'processing'
+        # Lo stato EDI (processing) viene gestito dal flusso standard Odoo
+        # tramite _l10n_it_edi_send() — non lo settiamo qui.
 
         env_label = _("TEST") if mode == 'test' else _("PRODUZIONE")
         self.message_post(
