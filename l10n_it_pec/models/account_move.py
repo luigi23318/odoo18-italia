@@ -120,12 +120,59 @@ class AccountMove(models.Model):
             },
         }
 
+    def _l10n_it_edi_send(self, attachments_vals):
+        """
+        Override solo per la modalità PEC demo: simulazione senza cambio stato.
+        Per PEC reale (test/production) e proxy standard → flusso Odoo nativo.
+        """
+        pec_demo = self.filtered(
+            lambda m: m._l10n_it_edi_pec_is_active()
+            and m.company_id.l10n_it_edi_pec_mode == 'demo'
+        )
+        rest = self - pec_demo
+
+        results = {}
+
+        # Tutto ciò che non è PEC demo → flusso standard
+        # (per PEC reale, _l10n_it_edi_upload intercetta il trasporto)
+        if rest:
+            results.update(super(AccountMove, rest)._l10n_it_edi_send(
+                {m: v for m, v in attachments_vals.items() if m in rest}
+            ))
+
+        # PEC demo: solo simulazione, nessun cambio stato EDI
+        for move in pec_demo:
+            attachment = attachments_vals.get(move, {})
+            filename = attachment.get('name', '')
+            xml_content = attachment.get('raw', b'')
+
+            xml_bytes = xml_content if isinstance(xml_content, bytes) else xml_content
+            att = move.env['ir.attachment'].create({
+                'name': filename,
+                'raw': xml_bytes,
+                'res_model': 'account.move',
+                'res_id': move.id,
+                'mimetype': 'application/xml',
+            })
+            move.l10n_it_pec_xml_attachment_id = att
+            move.l10n_it_pec_sent_date = fields.Datetime.now()
+            move.l10n_it_pec_last_error = False
+
+            message = _(
+                "DEMO: simulation of sending e-invoice file %s via PEC. "
+                "No real PEC was sent.", filename
+            )
+            move.sudo().message_post(body=message)
+            results[filename] = {}
+
+        return results
+
     def _l10n_it_edi_upload(self, files):
         """
         Override del trasporto EDI — Opzione C.
 
-        Se la modalità PEC è attiva, invia via SMTP/PEC invece del proxy Odoo.
-        Altrimenti, passa al flusso standard.
+        Se la modalità PEC è attiva (test/production), invia via SMTP/PEC
+        invece del proxy Odoo. Altrimenti, passa al flusso standard.
 
         Ritorna lo stesso formato dello standard:
         - Successo: {filename: {'id_transaction': '...'}}
@@ -205,19 +252,8 @@ class AccountMove(models.Model):
         })
         self.l10n_it_pec_xml_attachment_id = attachment
 
-        # ── DEMO MODE: dry-run (lo standard usa id_transaction='demo') ──
-        if mode == 'demo':
-            _logger.info(
-                "[PEC DEMO] Fattura %s — XML generato (%d bytes), "
-                "filename: %s — Nessun invio reale.",
-                self.name, len(xml_bytes), filename,
-            )
-            self.l10n_it_pec_sent_date = fields.Datetime.now()
-            self.l10n_it_pec_message_id = 'demo'
-            self.l10n_it_pec_last_error = False
-            return
-
         # ── INVIO REALE (test / production) ───────────────────────────
+        # La modalità demo è gestita in _l10n_it_edi_send() e non arriva qui.
         company._check_pec_configuration()
         destination = company._get_pec_sdi_destination()
 
