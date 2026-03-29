@@ -90,6 +90,15 @@ class ResCompany(models.Model):
         help="Indirizzo PEC per l'ambiente di test SDI, se diverso.",
     )
 
+    # ── Bypass check proxy user per company che usano PEC ──────────────
+    def _l10n_it_edi_export_check(self):
+        errors = super()._l10n_it_edi_export_check()
+        # Se la company ha la modalità PEC configurata, non serve il proxy Odoo
+        pec_companies = self.filtered(lambda c: c.l10n_it_edi_pec_mode)
+        if pec_companies:
+            errors.pop('l10n_it_edi_settings_l10n_it_edi_proxy_user_id', None)
+        return errors
+
     # ── Helper: indirizzo destinatario effettivo ──────────────────────
     @api.depends('l10n_it_edi_pec_mode')
     def _get_pec_sdi_destination(self):
