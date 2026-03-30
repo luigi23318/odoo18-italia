@@ -190,8 +190,8 @@ class AccountMove(models.Model):
             move.l10n_it_pec_last_error = False
 
             message = _(
-                "DEMO: simulation of sending e-invoice file %s via PEC. "
-                "No real PEC was sent.", filename
+                "DEMO: simulazione invio fattura elettronica %s via PEC. "
+                "Nessuna PEC è stata realmente inviata.", filename
             )
             move.sudo().message_post(body=message)
             results[filename] = {}
@@ -426,7 +426,7 @@ class AccountMove(models.Model):
         })
 
         filename = self.l10n_it_edi_attachment_id.name if self.l10n_it_edi_attachment_id else self.name
-        message = _("SDI notification %(type)s (%(label)s) received for %(file)s.",
+        message = _("Notifica SDI %(type)s (%(label)s) ricevuta per %(file)s.",
                      type=notification_type, label=label, file=filename)
 
         # Usa il metodo standard per aggiornare stato/transaction/header
