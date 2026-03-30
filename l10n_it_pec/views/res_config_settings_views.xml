@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ═══════════════════════════════════════════════════════════════
+         Vista Impostazioni: Sezione PEC SDI
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="res_config_settings_view_form_pec" model="ir.ui.view">
+        <field name="name">res.config.settings.form.pec</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='account']" position="inside">
+
+                <block title="PEC SDI - Fatturazione Elettronica via PEC"
+                       name="pec_sdi_settings">
+
+                    <setting string="Modalità PEC"
+                             help="Scegli come inviare le fatture elettroniche allo SDI">
+                        <field name="l10n_it_edi_pec_mode" widget="radio"/>
+                    </setting>
+
+                    <setting string="Indirizzo PEC mittente"
+                             invisible="not l10n_it_edi_pec_mode"
+                             help="PEC registrata presso lo SDI per l'invio fatture">
+                        <field name="l10n_it_pec_email"/>
+                    </setting>
+
+                    <setting string="Server SMTP PEC"
+                             invisible="not l10n_it_edi_pec_mode"
+                             help="Configurazione server per l'invio PEC">
+                        <div class="content-group">
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_smtp_server" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_smtp_server" class="oe_inline"
+                                       placeholder="es: smtps.pec.aruba.it"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_smtp_port" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_smtp_port" class="oe_inline"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_smtp_security" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_smtp_security" class="oe_inline"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_smtp_user" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_smtp_user" class="oe_inline"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_smtp_password" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_smtp_password" class="oe_inline"
+                                       password="True"/>
+                            </div>
+                        </div>
+                    </setting>
+
+                    <setting string="Server IMAP PEC (ricezione)"
+                             invisible="not l10n_it_edi_pec_mode"
+                             help="Per ricevere le notifiche SDI e le fatture passive">
+                        <div class="content-group">
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_imap_server" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_imap_server" class="oe_inline"
+                                       placeholder="es: imaps.pec.aruba.it"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_imap_port" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_imap_port" class="oe_inline"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_imap_user" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_imap_user" class="oe_inline"
+                                       placeholder="Se vuoto, usa utente SMTP"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_imap_password" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_imap_password" class="oe_inline"
+                                       password="True" placeholder="Se vuoto, usa password SMTP"/>
+                            </div>
+                        </div>
+                    </setting>
+
+                    <setting string="Indirizzi SDI"
+                             invisible="not l10n_it_edi_pec_mode"
+                             help="Indirizzi PEC dello SDI per invio e test">
+                        <div class="content-group">
+                            <div class="row mt8">
+                                <label for="l10n_it_pec_sdi_address" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_sdi_address" class="oe_inline"/>
+                            </div>
+                            <div class="row mt8"
+                                 invisible="l10n_it_edi_pec_mode != 'test'">
+                                <label for="l10n_it_pec_sdi_test_address" class="col-3 o_light_label"/>
+                                <field name="l10n_it_pec_sdi_test_address" class="oe_inline"
+                                       placeholder="Indirizzo PEC SDI di test"/>
+                            </div>
+                        </div>
+                    </setting>
+
+                </block>
+            </xpath>
+        </field>
+    </record>
+    <!-- ═══════════════════════════════════════════════════════════════
+         Nascondi configurazione SDI proxy standard quando PEC è installato
+         (rimosso automaticamente alla disinstallazione del modulo)
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="hide_standard_sdi_settings" model="ir.ui.view">
+        <field name="name">res.config.settings.hide.sdi.proxy</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="l10n_it_edi.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='account_edi']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//block[@id='account_edi_branch']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>
