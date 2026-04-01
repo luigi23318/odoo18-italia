@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ═══════════════════════════════════════════════════════════════
+         Vista Fattura: Bottoni PEC e campi informativi
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="view_move_form_pec" model="ir.ui.view">
+        <field name="name">account.move.form.pec</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Bottoni PEC nella barra superiore -->
+            <xpath expr="//header" position="inside">
+                <button name="action_l10n_it_pec_send"
+                        string="📨 Invia via PEC"
+                        type="object"
+                        class="btn-primary"
+                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund')"
+                        groups="l10n_it_pec.group_pec_manager"/>
+                <button name="action_l10n_it_pec_preview_xml"
+                        string="👁 Anteprima XML"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund')"
+                        groups="l10n_it_pec.group_pec_manager"/>
+            </xpath>
+
+            <!-- Campi informativi PEC nel tab "Altre informazioni" -->
+            <xpath expr="//page[@name='other_info']//group[last()]" position="after">
+                <group string="Invio PEC SDI" name="pec_info"
+                       invisible="move_type not in ('out_invoice', 'out_refund')">
+                    <group>
+                        <field name="l10n_it_pec_sent_date" readonly="1"/>
+                        <field name="l10n_it_pec_message_id" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="l10n_it_pec_xml_attachment_id" readonly="1"/>
+                        <field name="l10n_it_pec_last_error" readonly="1"
+                               invisible="not l10n_it_pec_last_error"
+                               widget="text"/>
+                    </group>
+                </group>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Vista Lista: Colonna stato PEC
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="view_move_tree_pec" model="ir.ui.view">
+        <field name="name">account.move.tree.pec</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_out_invoice_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='status_in_payment']" position="after">
+                <field name="l10n_it_pec_sent_date" string="Inviata PEC"
+                       optional="hide" width="0.8"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Azione server: Invio PEC massivo (da lista fatture)
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="action_pec_send_wizard" model="ir.actions.act_window">
+        <field name="name">Invia via PEC allo SDI</field>
+        <field name="res_model">l10n_it_pec.send.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_view_types">list</field>
+        <field name="groups_id" eval="[(4, ref('l10n_it_pec.group_pec_manager'))]"/>
+    </record>
+
+</odoo>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ═══════════════════════════════════════════════════════════════
+         Vista Company: Configurazione PEC SDI
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="view_company_form_pec" model="ir.ui.view">
+        <field name="name">res.company.form.pec</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[last()]" position="after">
+                <page string="PEC SDI" name="pec_sdi">
+
+                    <group string="Modalità di trasmissione">
+                        <group>
+                            <field name="l10n_it_edi_pec_mode" widget="radio"/>
+                        </group>
+                    </group>
+
+                    <group string="Server SMTP PEC (Invio)"
+                           invisible="not l10n_it_edi_pec_mode">
+                        <group>
+                            <field name="l10n_it_pec_email"/>
+                            <field name="l10n_it_pec_smtp_server"/>
+                            <field name="l10n_it_pec_smtp_port"/>
+                            <field name="l10n_it_pec_smtp_security" widget="radio"/>
+                        </group>
+                        <group>
+                            <field name="l10n_it_pec_smtp_user"/>
+                            <field name="l10n_it_pec_smtp_password" password="True"/>
+                            <button name="action_test_pec_connection"
+                                    string="🔌 Test connessione SMTP"
+                                    type="object"
+                                    class="btn-primary"/>
+                        </group>
+                    </group>
+
+                    <group string="Server IMAP PEC (Ricezione notifiche)"
+                           invisible="not l10n_it_edi_pec_mode">
+                        <group>
+                            <field name="l10n_it_pec_imap_server"/>
+                            <field name="l10n_it_pec_imap_port"/>
+                        </group>
+                        <group>
+                            <field name="l10n_it_pec_imap_user"
+                                   placeholder="Se vuoto, usa utente SMTP"/>
+                            <field name="l10n_it_pec_imap_password" password="True"
+                                   placeholder="Se vuoto, usa password SMTP"/>
+                            <button name="action_test_pec_imap_connection"
+                                    string="🔌 Test connessione IMAP"
+                                    type="object"
+                                    class="btn-primary"/>
+                        </group>
+                    </group>
+
+                    <group string="Indirizzi SDI"
+                           invisible="not l10n_it_edi_pec_mode">
+                        <group>
+                            <field name="l10n_it_pec_sdi_address"/>
+                            <field name="l10n_it_pec_sdi_test_address"
+                                   invisible="l10n_it_edi_pec_mode != 'test'"/>
+                        </group>
+                    </group>
+
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
