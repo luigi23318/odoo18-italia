@@ -1,2 +1,0 @@
-- [l10n_it_pec - Stato sviluppo](project_l10n_it_pec_status.md) — Architettura, struttura file, decisioni, problemi noti e TODO del modulo PEC SDI
-- [Feedback - Solo modifiche richieste](feedback_minimal_changes.md) — L'utente vuole SOLO le modifiche esplicitamente richieste, niente extra
