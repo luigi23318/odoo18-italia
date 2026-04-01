@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pec_upload_signed_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_it_pec.upload.signed.wizard.form</field>
+        <field name="model">l10n_it_pec.upload.signed.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Carica XML firmato">
+                <group>
+                    <p class="text-muted">
+                        Caricare il file XML firmato digitalmente (formato CAdES .xml.p7m o XAdES .xml).
+                        Il file deve corrispondere all'XML della fattura.
+                    </p>
+                    <field name="move_id" invisible="1"/>
+                    <field name="signed_file" filename="signed_filename"/>
+                    <field name="signed_filename" invisible="1"/>
+                </group>
+                <footer>
+                    <button string="Carica" name="action_upload" type="object" class="btn-primary"/>
+                    <button string="Annulla" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
