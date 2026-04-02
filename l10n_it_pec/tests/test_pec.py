@@ -155,34 +155,34 @@ class TestPecAccountMove(TransactionCase):
         self.assertEqual(invoice.l10n_it_edi_state, 'rejected')
 
     def test_15_notification_ne_accepted(self):
-        """Notifica NE con EC01 (Accettazione) → delivered."""
+        """Notifica NE con EC01 (Accettazione PA) → accepted_by_pa_partner."""
         invoice = self._create_test_invoice()
         invoice.l10n_it_edi_state = 'processing'
 
         xml_ne = b'<NotificaNE><Esito>EC01</Esito></NotificaNE>'
         invoice._l10n_it_pec_process_sdi_notification('NE', xml_ne)
 
-        self.assertEqual(invoice.l10n_it_edi_state, 'forwarded')
+        self.assertEqual(invoice.l10n_it_edi_state, 'accepted_by_pa_partner')
 
     def test_16_notification_ne_rejected(self):
-        """Notifica NE con EC02 (Rifiuto) → invalid."""
+        """Notifica NE con EC02 (Rifiuto PA) → rejected_by_pa_partner."""
         invoice = self._create_test_invoice()
         invoice.l10n_it_edi_state = 'processing'
 
         xml_ne = b'<NotificaNE><Esito>EC02</Esito></NotificaNE>'
         invoice._l10n_it_pec_process_sdi_notification('NE', xml_ne)
 
-        self.assertEqual(invoice.l10n_it_edi_state, 'rejected')
+        self.assertEqual(invoice.l10n_it_edi_state, 'rejected_by_pa_partner')
 
     def test_17_notification_dt(self):
-        """Notifica DT (Decorrenza Termini = silenzio-assenso) → delivered."""
+        """Notifica DT (Decorrenza Termini = silenzio-assenso PA) → accepted_by_pa_partner_after_expiry."""
         invoice = self._create_test_invoice()
         invoice.l10n_it_edi_state = 'processing'
 
         xml_dt = b'<NotificaDT><NomeFile>test.xml</NomeFile></NotificaDT>'
         invoice._l10n_it_pec_process_sdi_notification('DT', xml_dt)
 
-        self.assertEqual(invoice.l10n_it_edi_state, 'forwarded')
+        self.assertEqual(invoice.l10n_it_edi_state, 'accepted_by_pa_partner_after_expiry')
 
     # ── Helper ────────────────────────────────────────────────────────
 
