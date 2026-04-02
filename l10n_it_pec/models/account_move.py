@@ -263,6 +263,24 @@ class AccountMove(models.Model):
             filename = attachment.get('name', '')
             xml_content = attachment.get('raw', b'')
 
+            # Firma digitale PA: stessa logica di _l10n_it_edi_upload
+            if move._l10n_it_pec_is_pa_invoice() and move.l10n_it_pec_signed_attachment_id:
+                signed_att = move.l10n_it_pec_signed_attachment_id
+                send_filename = signed_att.name
+            elif move._l10n_it_pec_is_pa_invoice() and not move.l10n_it_pec_signed_attachment_id:
+                error_message = _(
+                    "Le fatture verso la PA richiedono la firma digitale. "
+                    "Scaricare l'XML, firmarlo e ricaricare il file firmato."
+                )
+                move.l10n_it_edi_header = error_message
+                move.sudo().message_post(body=error_message)
+                results[filename] = {
+                    'error_message': error_message,
+                }
+                continue
+            else:
+                send_filename = filename
+
             xml_bytes = xml_content if isinstance(xml_content, bytes) else xml_content
             att = move.env['ir.attachment'].create({
                 'name': filename,
@@ -277,7 +295,7 @@ class AccountMove(models.Model):
 
             message = _(
                 "DEMO: simulazione invio fattura elettronica %s via PEC. "
-                "Nessuna PEC è stata realmente inviata.", filename
+                "Nessuna PEC è stata realmente inviata.", send_filename
             )
             move.sudo().message_post(body=message)
             results[filename] = {}
