@@ -16,17 +16,17 @@ _logger = logging.getLogger(__name__)
 # Mapping notifiche SDI → stato l10n_it_edi nativo Odoo 18
 # RC  = Ricevuta di Consegna         → forwarded (accettata e consegnata)
 # NS  = Notifica di Scarto           → rejected (XML non valido)
-# MC  = Mancata Consegna             → forward_attempt (in attesa retry)
+# MC  = Mancata Consegna             → forward_failed (consegna fallita)
 # AT  = Attestazione                  → forwarded
-# NE  = Notifica Esito (accettata)   → forwarded
-# NE  = Notifica Esito (rifiutata)   → rejected
-# DT  = Decorrenza Termini           → forwarded (silenzio-assenso)
+# NE  = Notifica Esito (accettata)   → accepted_by_pa_partner
+# NE  = Notifica Esito (rifiutata)   → rejected_by_pa_partner
+# DT  = Decorrenza Termini           → accepted_by_pa_partner_after_expiry (silenzio-assenso)
 SDI_NOTIFICATION_MAP = {
     'RC': 'forwarded',
     'NS': 'rejected',
-    'MC': 'forward_attempt',
+    'MC': 'forward_failed',
     'AT': 'forwarded',
-    'DT': 'forwarded',
+    'DT': 'accepted_by_pa_partner_after_expiry',
     # NE dipende dal contenuto (Accettazione/Rifiuto)
 }
 
@@ -580,10 +580,10 @@ class AccountMove(models.Model):
             # Cerca il tag Esito nel XML della notifica
             # EC01 = Accettazione, EC02 = Rifiuto
             if 'EC01' in content:
-                return 'forwarded'
+                return 'accepted_by_pa_partner'
             elif 'EC02' in content:
-                return 'rejected'
+                return 'rejected_by_pa_partner'
         except Exception:
             _logger.warning("Impossibile parsificare Notifica Esito per %s", self.name)
 
-        return 'forwarded'  # default safe: silenzio-assenso
+        return 'accepted_by_pa_partner'  # default safe: silenzio-assenso
