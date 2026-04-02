@@ -37,8 +37,8 @@ Funzionalità:
         'mail',
     ],
     'data': [
-        'security/ir.model.access.csv',
         'security/res_groups.xml',
+        'security/ir.model.access.csv',
         'data/cron_data.xml',
         'views/res_company_views.xml',
         'views/res_config_settings_views.xml',
