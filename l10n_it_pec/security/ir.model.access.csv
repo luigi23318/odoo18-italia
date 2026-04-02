@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pec_send_wizard_accountant,l10n_it_pec.send.wizard accountant,model_l10n_it_pec_send_wizard,account.group_account_invoice,1,1,1,0
+access_pec_mail_handler_system,l10n_it_pec.mail.handler system,model_l10n_it_pec_mail_handler,base.group_system,1,1,1,0
+access_pec_mail_handler_pec_manager,l10n_it_pec.mail.handler pec manager,model_l10n_it_pec_mail_handler,l10n_it_pec.group_pec_manager,1,0,0,0
+access_pec_upload_signed_wizard,l10n_it_pec.upload.signed.wizard,model_l10n_it_pec_upload_signed_wizard,base.group_user,1,1,1,0
