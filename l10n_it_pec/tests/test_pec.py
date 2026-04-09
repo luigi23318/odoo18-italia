@@ -208,3 +208,233 @@ class TestPecAccountMove(TransactionCase):
             invoice.action_post()
 
         return invoice
+
+
+@tagged('post_install', '-at_install')
+class TestPecPassiveInvoices(TransactionCase):
+    """Test acquisizione fatture passive via PEC.
+
+    Copre:
+    - Riconoscimento filename (xml, .xml.p7m, metadati, foreign VAT)
+    - Skip esplicito del file metadati SDI
+    - Deduplica su filename già importato
+    - Quarantena in caso di fallimento dell'import standard
+    - Allegato .eml del messaggio PEC originale
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.company = cls.env.company
+        cls.company.write({
+            'l10n_it_edi_pec_mode': 'demo',
+            'l10n_it_pec_email': 'test@pec.example.it',
+        })
+        cls.handler = cls.env['l10n_it_pec.mail.handler']
+
+        # Importa i pattern direttamente dal modulo per testarli.
+        from odoo.addons.l10n_it_pec.models import pec_mail_handler as pmh
+        cls.PASSIVE_PATTERN = pmh.SDI_PASSIVE_INVOICE_PATTERN
+        cls.METADATA_PATTERN = pmh.SDI_METADATA_FILENAME_PATTERN
+
+    # ── Test riconoscimento filename ───────────────────────────────────
+
+    def test_20_passive_pattern_plain_xml(self):
+        """Il regex accetta una fattura passiva XML italiana."""
+        self.assertTrue(
+            self.PASSIVE_PATTERN.match('IT01234567890_00001.xml')
+        )
+
+    def test_21_passive_pattern_signed_p7m(self):
+        """Il regex accetta una fattura passiva firmata CAdES (.xml.p7m)."""
+        self.assertTrue(
+            self.PASSIVE_PATTERN.match('IT01234567890_00001.xml.p7m')
+        )
+
+    def test_22_passive_pattern_alphanumeric_progressive(self):
+        """Il regex accetta un progressivo alfanumerico."""
+        self.assertTrue(
+            self.PASSIVE_PATTERN.match('IT01234567890_ABCDE.xml.p7m')
+        )
+
+    def test_23_passive_pattern_foreign_vat(self):
+        """Il regex accetta un fornitore estero con codice paese diverso."""
+        self.assertTrue(
+            self.PASSIVE_PATTERN.match('DE123456789_00001.xml')
+        )
+
+    def test_24_passive_pattern_case_insensitive(self):
+        """Il regex è case-insensitive sull'estensione."""
+        self.assertTrue(
+            self.PASSIVE_PATTERN.match('IT01234567890_00001.XML.P7M')
+        )
+
+    def test_25_passive_pattern_rejects_notification(self):
+        """Il regex non matcha le notifiche SDI (hanno _RC_, _NS_ ecc)."""
+        self.assertFalse(
+            self.PASSIVE_PATTERN.match('IT01234567890_5678_RC_001.xml')
+        )
+
+    def test_26_passive_pattern_rejects_random(self):
+        """Il regex rifiuta nomi file arbitrari."""
+        self.assertFalse(self.PASSIVE_PATTERN.match('random.xml'))
+        self.assertFalse(self.PASSIVE_PATTERN.match('invoice.pdf'))
+
+    def test_27_metadata_pattern_detects_metadata(self):
+        """Il regex metadati identifica i file _metadati.xml."""
+        self.assertTrue(
+            self.METADATA_PATTERN.search('IT01234567890_00001_metadati.xml')
+        )
+
+    def test_28_metadata_pattern_ignores_invoice(self):
+        """Il regex metadati non matcha una fattura regolare."""
+        self.assertFalse(
+            self.METADATA_PATTERN.search('IT01234567890_00001.xml')
+        )
+
+    # ── Test _handle_passive_invoice ───────────────────────────────────
+
+    def test_30_passive_deduplication(self):
+        """Un filename già presente come attachment di una move
+        della stessa company non viene reimportato."""
+        filename = 'IT99999999999_00001.xml'
+        xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
+
+        # Simula un import precedente: crea una move e un attachment
+        # collegato con lo stesso filename.
+        journal = self.env['account.journal'].search([
+            ('type', '=', 'purchase'),
+            ('company_id', '=', self.company.id),
+        ], limit=1)
+        existing_move = self.env['account.move'].create({
+            'move_type': 'in_invoice',
+            'journal_id': journal.id,
+        })
+        self.env['ir.attachment'].create({
+            'name': filename,
+            'raw': xml,
+            'mimetype': 'application/xml',
+            'res_model': 'account.move',
+            'res_id': existing_move.id,
+        })
+
+        # L'import standard non deve essere chiamato grazie alla dedup.
+        with patch.object(
+            type(self.env['account.move']),
+            '_l10n_it_edi_import_invoices',
+            create=True,
+        ) as mock_import:
+            self.handler._handle_passive_invoice(
+                xml, filename, self.company,
+                raw_email=b'raw', subject='Test',
+            )
+            mock_import.assert_not_called()
+
+    def test_31_passive_quarantine_on_missing_method(self):
+        """Se _l10n_it_edi_import_invoices non esiste, la fattura
+        viene messa in quarantena (non persa)."""
+        filename = 'IT88888888888_00001.xml'
+        xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
+
+        AccountMove = type(self.env['account.move'])
+        had_method = hasattr(AccountMove, '_l10n_it_edi_import_invoices')
+        saved = None
+        if had_method:
+            saved = getattr(AccountMove, '_l10n_it_edi_import_invoices')
+            delattr(AccountMove, '_l10n_it_edi_import_invoices')
+        try:
+            self.handler._handle_passive_invoice(
+                xml, filename, self.company, raw_email=None,
+            )
+        finally:
+            if had_method and saved is not None:
+                setattr(AccountMove, '_l10n_it_edi_import_invoices', saved)
+
+        quarantined = self.env['ir.attachment'].search([
+            ('name', '=', f'QUARANTINE_{filename}'),
+        ], limit=1)
+        self.assertTrue(
+            quarantined,
+            "L'XML doveva essere messo in quarantena, non perso.",
+        )
+
+    def test_32_passive_quarantine_on_import_failure(self):
+        """Se _l10n_it_edi_import_invoices solleva, la fattura
+        finisce in quarantena."""
+        filename = 'IT77777777777_00001.xml'
+        xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
+
+        def _raise(*args, **kwargs):
+            raise ValueError("XML malformato simulato")
+
+        with patch.object(
+            type(self.env['account.move']),
+            '_l10n_it_edi_import_invoices',
+            create=True,
+            side_effect=_raise,
+        ):
+            self.handler._handle_passive_invoice(
+                xml, filename, self.company, raw_email=None,
+            )
+
+        quarantined = self.env['ir.attachment'].search([
+            ('name', '=', f'QUARANTINE_{filename}'),
+        ], limit=1)
+        self.assertTrue(quarantined)
+
+    def test_33_passive_quarantine_on_empty_result(self):
+        """Se l'import ritorna un recordset vuoto, quarantena."""
+        filename = 'IT66666666666_00001.xml'
+        xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
+
+        empty_moves = self.env['account.move']
+        with patch.object(
+            type(self.env['account.move']),
+            '_l10n_it_edi_import_invoices',
+            create=True,
+            return_value=empty_moves,
+        ):
+            self.handler._handle_passive_invoice(
+                xml, filename, self.company, raw_email=None,
+            )
+
+        quarantined = self.env['ir.attachment'].search([
+            ('name', '=', f'QUARANTINE_{filename}'),
+        ], limit=1)
+        self.assertTrue(quarantined)
+
+    def test_34_passive_eml_attachment(self):
+        """Quando disponibile, il messaggio PEC originale (.eml) viene
+        allegato alla fattura importata per conservazione."""
+        filename = 'IT55555555555_00001.xml'
+        xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
+        raw_eml = b'From: sdi01@pec.fatturapa.it\r\nSubject: test\r\n\r\nbody'
+
+        # Crea una move "finta" che il mock restituirà come importata.
+        journal = self.env['account.journal'].search([
+            ('type', '=', 'purchase'),
+            ('company_id', '=', self.company.id),
+        ], limit=1)
+        fake_move = self.env['account.move'].create({
+            'move_type': 'in_invoice',
+            'journal_id': journal.id,
+        })
+
+        with patch.object(
+            type(self.env['account.move']),
+            '_l10n_it_edi_import_invoices',
+            create=True,
+            return_value=fake_move,
+        ):
+            self.handler._handle_passive_invoice(
+                xml, filename, self.company,
+                raw_email=raw_eml, subject='Consegna fattura',
+            )
+
+        eml_att = self.env['ir.attachment'].search([
+            ('res_model', '=', 'account.move'),
+            ('res_id', '=', fake_move.id),
+            ('mimetype', '=', 'message/rfc822'),
+        ], limit=1)
+        self.assertTrue(eml_att, "L'allegato .eml deve essere presente.")
+        self.assertIn('.eml', eml_att.name)
