@@ -349,27 +349,29 @@ class PecMailHandler(models.AbstractModel):
                 return
 
         # ── Import tramite il parser standard l10n_it_edi ─────────────
-        # Strategia: replichiamo il pattern usato da Odoo CE nel metodo
-        # standard `_l10n_it_edi_create_move_with_attachment`, ma senza
-        # passare per il proxy IAP (non abbiamo un proxy_user e il file
-        # non è criptato, arriva in chiaro dalla PEC).
+        # Replichiamo il pattern ufficiale usato dal codice standard
+        # di l10n_it_edi in account_move.py (righe 239-240 e 972):
         #
-        # 1) creiamo una account.move vuota con la company corretta
-        # 2) creiamo un ir.attachment con res_field='l10n_it_edi_attachment_file'
-        #    e collegato alla move: questo è il campo speciale che fa
-        #    scattare il decoder FatturaPA di Odoo
-        # 3) chiamiamo move.message_post(attachment_ids=[...]) che invoca
-        #    gli hook di _extend_with_attachments e popola la move
+        #   self.invalidate_recordset(fnames=[
+        #       'l10n_it_edi_attachment_id', 'l10n_it_edi_attachment_file'])
+        #   self.message_post(attachment_ids=self.l10n_it_edi_attachment_id.ids)
+        #   self._extend_with_attachments(self.l10n_it_edi_attachment_id, new=True)
         #
-        # Se dopo il message_post la move non ha partner_id valorizzato,
-        # consideriamo l'import fallito e mandiamo tutto in quarantena.
+        # Il punto cruciale è che il decoder FatturaPA viene agganciato
+        # passando l'attachment *tramite il campo computed*
+        # `l10n_it_edi_attachment_id`, non direttamente. Il campo viene
+        # popolato automaticamente quando l'attachment viene creato con
+        # res_field='l10n_it_edi_attachment_file'.
+        #
+        # Se dopo questo giro la move non ha partner_id valorizzato,
+        # il parser non si è agganciato: quarantena.
         created_moves = self.env['account.move']
         import_error = None
         try:
             move = self.env['account.move'].with_company(company).create({
                 'move_type': 'in_invoice',
             })
-            attachment = self.env['ir.attachment'].sudo().with_company(company).create({
+            self.env['ir.attachment'].sudo().with_company(company).create({
                 'name': filename,
                 'raw': xml_bytes,
                 'type': 'binary',
@@ -377,21 +379,32 @@ class PecMailHandler(models.AbstractModel):
                 'res_id': move.id,
                 'res_field': 'l10n_it_edi_attachment_file',
             })
+
+            # Invalida i campi computed per forzare il re-link dell'attachment
+            move.invalidate_recordset(fnames=[
+                'l10n_it_edi_attachment_id',
+                'l10n_it_edi_attachment_file',
+            ])
+
+            edi_attachment = move.l10n_it_edi_attachment_id
             move.with_context(
                 account_predictive_bills_disable_prediction=True,
                 no_new_invoice=True,
-            ).message_post(attachment_ids=attachment.ids)
+            ).message_post(attachment_ids=edi_attachment.ids)
+
+            # Chiama esplicitamente il decoder FatturaPA.
+            # Questo è il passaggio chiave che la message_post da sola
+            # non fa scattare da codice (funziona solo dall'UI).
+            move._extend_with_attachments(edi_attachment, new=True)
 
             # Verifica che il parser abbia popolato la move.
-            # Se partner_id è ancora vuoto significa che il decoder
-            # FatturaPA non si è agganciato o non ha riconosciuto il file.
             move.invalidate_recordset(['partner_id', 'invoice_line_ids'])
             if move.partner_id:
                 created_moves = move
             else:
                 import_error = (
                     "il parser FatturaPA non ha popolato la fattura "
-                    "(partner_id vuoto dopo message_post)"
+                    "(partner_id vuoto dopo _extend_with_attachments)"
                 )
                 # Cancella la move vuota per non sporcare il db.
                 move.with_context(force_delete=True).unlink()
