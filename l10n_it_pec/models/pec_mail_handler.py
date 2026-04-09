@@ -40,11 +40,12 @@ SDI_PASSIVE_INVOICE_PATTERN = re.compile(
 )
 
 # Pattern per il file metadati SDI che accompagna ogni fattura passiva.
-# Esempio: IT01234567890_00001_metadati.xml
+# Esempio canonico: IT01234567890_00001_metadati.xml
+# Esempio alternativo (Aruba e altri): IT01234567890_00001_MT_001.xml
 # Questo file NON è una fattura e non deve mai essere passato al motore
 # di import standard.
 SDI_METADATA_FILENAME_PATTERN = re.compile(
-    r'_metadati\.xml$',
+    r'(_metadati|_MT_\d+)\.xml$',
     re.IGNORECASE,
 )
 
@@ -347,30 +348,53 @@ class PecMailHandler(models.AbstractModel):
                 )
                 return
 
-        # ── Import via motore standard ────────────────────────────────
+        # ── Import tramite il parser standard l10n_it_edi ─────────────
+        # Strategia: replichiamo il pattern usato da Odoo CE nel metodo
+        # standard `_l10n_it_edi_create_move_with_attachment`, ma senza
+        # passare per il proxy IAP (non abbiamo un proxy_user e il file
+        # non è criptato, arriva in chiaro dalla PEC).
+        #
+        # 1) creiamo una account.move vuota con la company corretta
+        # 2) creiamo un ir.attachment con res_field='l10n_it_edi_attachment_file'
+        #    e collegato alla move: questo è il campo speciale che fa
+        #    scattare il decoder FatturaPA di Odoo
+        # 3) chiamiamo move.message_post(attachment_ids=[...]) che invoca
+        #    gli hook di _extend_with_attachments e popola la move
+        #
+        # Se dopo il message_post la move non ha partner_id valorizzato,
+        # consideriamo l'import fallito e mandiamo tutto in quarantena.
         created_moves = self.env['account.move']
         import_error = None
         try:
-            attachment = self.env['ir.attachment'].create({
+            move = self.env['account.move'].with_company(company).create({
+                'move_type': 'in_invoice',
+            })
+            attachment = self.env['ir.attachment'].sudo().with_company(company).create({
                 'name': filename,
                 'raw': xml_bytes,
-                'mimetype': 'application/xml',
+                'type': 'binary',
+                'res_model': 'account.move',
+                'res_id': move.id,
+                'res_field': 'l10n_it_edi_attachment_file',
             })
+            move.with_context(
+                account_predictive_bills_disable_prediction=True,
+                no_new_invoice=True,
+            ).message_post(attachment_ids=attachment.ids)
 
-            moves = self.env['account.move'].with_company(company)
-            if not hasattr(moves, '_l10n_it_edi_import_invoices'):
-                _logger.warning(
-                    "Metodo _l10n_it_edi_import_invoices non disponibile "
-                    "in questa versione di Odoo. Fattura passiva %s "
-                    "messa in quarantena.", filename,
+            # Verifica che il parser abbia popolato la move.
+            # Se partner_id è ancora vuoto significa che il decoder
+            # FatturaPA non si è agganciato o non ha riconosciuto il file.
+            move.invalidate_recordset(['partner_id', 'invoice_line_ids'])
+            if move.partner_id:
+                created_moves = move
+            else:
+                import_error = (
+                    "il parser FatturaPA non ha popolato la fattura "
+                    "(partner_id vuoto dopo message_post)"
                 )
-                self._quarantine_passive_invoice(
-                    xml_bytes, filename, company,
-                    reason="_l10n_it_edi_import_invoices non disponibile",
-                )
-                return
-
-            created_moves = moves._l10n_it_edi_import_invoices([attachment])
+                # Cancella la move vuota per non sporcare il db.
+                move.with_context(force_delete=True).unlink()
         except Exception as e:
             import_error = str(e)
             _logger.exception(
