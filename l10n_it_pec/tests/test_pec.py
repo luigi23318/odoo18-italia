@@ -296,7 +296,8 @@ class TestPecPassiveInvoices(TransactionCase):
 
     def test_30_passive_deduplication(self):
         """Un filename già presente come attachment di una move
-        della stessa company non viene reimportato."""
+        della stessa company non viene reimportato: non deve essere
+        creata nessuna nuova account.move."""
         filename = 'IT99999999999_00001.xml'
         xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
 
@@ -318,49 +319,24 @@ class TestPecPassiveInvoices(TransactionCase):
             'res_id': existing_move.id,
         })
 
-        # L'import standard non deve essere chiamato grazie alla dedup.
-        with patch.object(
-            type(self.env['account.move']),
-            '_l10n_it_edi_import_invoices',
-            create=True,
-        ) as mock_import:
-            self.handler._handle_passive_invoice(
-                xml, filename, self.company,
-                raw_email=b'raw', subject='Test',
-            )
-            mock_import.assert_not_called()
-
-    def test_31_passive_quarantine_on_missing_method(self):
-        """Se _l10n_it_edi_import_invoices non esiste, la fattura
-        viene messa in quarantena (non persa)."""
-        filename = 'IT88888888888_00001.xml'
-        xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
-
-        AccountMove = type(self.env['account.move'])
-        had_method = hasattr(AccountMove, '_l10n_it_edi_import_invoices')
-        saved = None
-        if had_method:
-            saved = getattr(AccountMove, '_l10n_it_edi_import_invoices')
-            delattr(AccountMove, '_l10n_it_edi_import_invoices')
-        try:
-            self.handler._handle_passive_invoice(
-                xml, filename, self.company, raw_email=None,
-            )
-        finally:
-            if had_method and saved is not None:
-                setattr(AccountMove, '_l10n_it_edi_import_invoices', saved)
-
-        quarantined = self.env['ir.attachment'].search([
-            ('name', '=', f'QUARANTINE_{filename}'),
-        ], limit=1)
-        self.assertTrue(
-            quarantined,
-            "L'XML doveva essere messo in quarantena, non perso.",
+        moves_before = self.env['account.move'].search_count([
+            ('company_id', '=', self.company.id),
+        ])
+        self.handler._handle_passive_invoice(
+            xml, filename, self.company,
+            raw_email=b'raw', subject='Test',
+        )
+        moves_after = self.env['account.move'].search_count([
+            ('company_id', '=', self.company.id),
+        ])
+        self.assertEqual(
+            moves_before, moves_after,
+            "La dedup deve impedire la creazione di una nuova move.",
         )
 
     def test_32_passive_quarantine_on_import_failure(self):
-        """Se _l10n_it_edi_import_invoices solleva, la fattura
-        finisce in quarantena."""
+        """Se message_post solleva un'eccezione durante l'import,
+        la fattura finisce in quarantena (il file non viene perso)."""
         filename = 'IT77777777777_00001.xml'
         xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
 
@@ -369,8 +345,7 @@ class TestPecPassiveInvoices(TransactionCase):
 
         with patch.object(
             type(self.env['account.move']),
-            '_l10n_it_edi_import_invoices',
-            create=True,
+            'message_post',
             side_effect=_raise,
         ):
             self.handler._handle_passive_invoice(
@@ -382,17 +357,19 @@ class TestPecPassiveInvoices(TransactionCase):
         ], limit=1)
         self.assertTrue(quarantined)
 
-    def test_33_passive_quarantine_on_empty_result(self):
-        """Se l'import ritorna un recordset vuoto, quarantena."""
+    def test_33_passive_quarantine_on_unparsed_invoice(self):
+        """Se dopo message_post la move non ha partner_id valorizzato,
+        il parser standard non si è agganciato: quarantena."""
         filename = 'IT66666666666_00001.xml'
         xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
 
-        empty_moves = self.env['account.move']
+        # Mock di message_post per simulare il caso in cui il decoder
+        # FatturaPA non si aggancia e la move resta vuota.
+        # Non facciamo nulla: la move creata rimane senza partner_id.
         with patch.object(
             type(self.env['account.move']),
-            '_l10n_it_edi_import_invoices',
-            create=True,
-            return_value=empty_moves,
+            'message_post',
+            return_value=self.env['mail.message'],
         ):
             self.handler._handle_passive_invoice(
                 xml, filename, self.company, raw_email=None,
@@ -401,39 +378,57 @@ class TestPecPassiveInvoices(TransactionCase):
         quarantined = self.env['ir.attachment'].search([
             ('name', '=', f'QUARANTINE_{filename}'),
         ], limit=1)
-        self.assertTrue(quarantined)
+        self.assertTrue(
+            quarantined,
+            "Se il parser non popola partner_id la fattura va in quarantena.",
+        )
 
     def test_34_passive_eml_attachment(self):
-        """Quando disponibile, il messaggio PEC originale (.eml) viene
-        allegato alla fattura importata per conservazione."""
+        """Quando l'import ha successo e raw_email è disponibile, il
+        messaggio PEC originale (.eml) viene allegato alla fattura
+        importata per conservazione/audit."""
         filename = 'IT55555555555_00001.xml'
         xml = b'<FatturaElettronica>dummy</FatturaElettronica>'
         raw_eml = b'From: sdi01@pec.fatturapa.it\r\nSubject: test\r\n\r\nbody'
 
-        # Crea una move "finta" che il mock restituirà come importata.
-        journal = self.env['account.journal'].search([
-            ('type', '=', 'purchase'),
-            ('company_id', '=', self.company.id),
-        ], limit=1)
-        fake_move = self.env['account.move'].create({
-            'move_type': 'in_invoice',
-            'journal_id': journal.id,
+        # Crea un partner che useremo come "fornitore" simulato
+        # dal parser FatturaPA.
+        fake_partner = self.env['res.partner'].create({
+            'name': 'Fornitore Test SRL',
+            'company_type': 'company',
         })
+
+        # Mock di message_post per simulare un import di successo:
+        # popola partner_id sulla move come farebbe il vero parser.
+        def _fake_message_post(self, **kwargs):
+            self.partner_id = fake_partner
+            return self.env['mail.message']
 
         with patch.object(
             type(self.env['account.move']),
-            '_l10n_it_edi_import_invoices',
-            create=True,
-            return_value=fake_move,
+            'message_post',
+            autospec=True,
+            side_effect=_fake_message_post,
         ):
             self.handler._handle_passive_invoice(
                 xml, filename, self.company,
                 raw_email=raw_eml, subject='Consegna fattura',
             )
 
+        # Recupera la move creata dall'handler cercando la nuova
+        # account.move con quel partner.
+        imported_move = self.env['account.move'].search([
+            ('partner_id', '=', fake_partner.id),
+            ('company_id', '=', self.company.id),
+        ], limit=1)
+        self.assertTrue(
+            imported_move,
+            "La fattura importata doveva essere presente.",
+        )
+
         eml_att = self.env['ir.attachment'].search([
             ('res_model', '=', 'account.move'),
-            ('res_id', '=', fake_move.id),
+            ('res_id', '=', imported_move.id),
             ('mimetype', '=', 'message/rfc822'),
         ], limit=1)
         self.assertTrue(eml_att, "L'allegato .eml deve essere presente.")
