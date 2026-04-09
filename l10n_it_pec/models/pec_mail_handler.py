@@ -392,7 +392,7 @@ class PecMailHandler(models.AbstractModel):
         _logger.info(
             "Fattura passiva importata con successo: %s → %s",
             filename,
-            ', '.join(created_moves.mapped('name')),
+            ', '.join(m.name or f"(draft #{m.id})" for m in created_moves),
         )
 
         for move in created_moves:
