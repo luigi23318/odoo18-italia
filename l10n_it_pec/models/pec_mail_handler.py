@@ -28,9 +28,23 @@ SDI_INVOICE_REF_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Pattern per fatture passive ricevute
+# Pattern per fatture passive ricevute.
+# Accetta sia XML puro sia CAdES (.xml.p7m). Il filename segue lo schema
+# FatturaPA: <CodicePaese><IdentificativoFiscale>_<Progressivo>.xml[.p7m]
+# Esempi validi:  IT01234567890_00001.xml , IT01234567890_ABCDE.xml.p7m
+# La guard sul file metadati è gestita separatamente in _process_pec_message
+# tramite SDI_METADATA_FILENAME_PATTERN per evitare falsi positivi.
 SDI_PASSIVE_INVOICE_PATTERN = re.compile(
-    r'IT\d{11}_\w+\.xml',
+    r'^[A-Z]{2}[A-Z0-9]{2,28}_[A-Z0-9]+\.xml(\.p7m)?$',
+    re.IGNORECASE,
+)
+
+# Pattern per il file metadati SDI che accompagna ogni fattura passiva.
+# Esempio: IT01234567890_00001_metadati.xml
+# Questo file NON è una fattura e non deve mai essere passato al motore
+# di import standard.
+SDI_METADATA_FILENAME_PATTERN = re.compile(
+    r'_metadati\.xml$',
     re.IGNORECASE,
 )
 
@@ -176,6 +190,14 @@ class PecMailHandler(models.AbstractModel):
             filename = attachment['filename']
             content = attachment['content']
 
+            # Scarta esplicitamente i file di metadati SDI:
+            # accompagnano le fatture passive ma non sono fatture.
+            if SDI_METADATA_FILENAME_PATTERN.search(filename):
+                _logger.info(
+                    "Ignorato file metadati SDI: %s", filename,
+                )
+                continue
+
             # Identifica tipo di messaggio
             notif_match = SDI_NOTIFICATION_PATTERN.search(filename)
 
@@ -189,6 +211,7 @@ class PecMailHandler(models.AbstractModel):
                 # È una fattura passiva ricevuta
                 self._handle_passive_invoice(
                     content, filename, company,
+                    raw_email=raw_email, subject=subject,
                 )
             else:
                 _logger.info(
@@ -280,57 +303,155 @@ class PecMailHandler(models.AbstractModel):
     #  Gestione fatture passive
     # ══════════════════════════════════════════════════════════════════
 
-    def _handle_passive_invoice(self, xml_content, filename, company):
+    def _handle_passive_invoice(self, xml_content, filename, company,
+                                raw_email=None, subject=None):
         """
         Gestisce una fattura passiva ricevuta via PEC dallo SDI.
         Importa l'XML e crea la fattura fornitore in bozza.
+
+        Garanzie:
+        - Deduplica sul filename: se esiste già un ir.attachment con lo
+          stesso nome collegato a una account.move della stessa company,
+          il messaggio viene ignorato.
+        - Quarantena in caso di errore: se l'import standard fallisce o
+          non crea alcuna fattura, l'XML originale viene comunque salvato
+          come ir.attachment "orfano" con un tag di quarantena, così non
+          si perde mai il documento.
+        - Archivio .eml: se disponibile, il messaggio PEC originale viene
+          allegato alla fattura importata per audit/conservazione.
         """
         _logger.info(
             "Fattura passiva ricevuta: %s (company: %s)",
             filename, company.name,
         )
 
+        xml_bytes = (
+            xml_content if isinstance(xml_content, bytes)
+            else xml_content.encode('utf-8')
+        )
+
+        # ── Deduplica ─────────────────────────────────────────────────
+        # Se un attachment con lo stesso nome è già collegato a una
+        # account.move della stessa company, la fattura è già stata
+        # importata in un giro precedente del cron: non rifare nulla.
+        existing = self.env['ir.attachment'].search([
+            ('name', '=', filename),
+            ('res_model', '=', 'account.move'),
+        ], limit=1)
+        if existing:
+            existing_move = self.env['account.move'].browse(existing.res_id)
+            if existing_move.exists() and existing_move.company_id == company:
+                _logger.info(
+                    "Fattura passiva %s già importata (move %s), skip.",
+                    filename, existing_move.name or existing_move.id,
+                )
+                return
+
+        # ── Import via motore standard ────────────────────────────────
+        created_moves = self.env['account.move']
+        import_error = None
         try:
-            # Usa il motore di importazione standard di l10n_it_edi
             attachment = self.env['ir.attachment'].create({
                 'name': filename,
-                'raw': xml_content if isinstance(xml_content, bytes) else xml_content.encode('utf-8'),
+                'raw': xml_bytes,
                 'mimetype': 'application/xml',
             })
 
-            # Prova ad importare usando il decoder standard
             moves = self.env['account.move'].with_company(company)
             if not hasattr(moves, '_l10n_it_edi_import_invoices'):
                 _logger.warning(
-                    "Metodo _l10n_it_edi_import_invoices non disponibile in questa versione di Odoo. "
-                    "Fattura passiva %s non importata.", filename,
+                    "Metodo _l10n_it_edi_import_invoices non disponibile "
+                    "in questa versione di Odoo. Fattura passiva %s "
+                    "messa in quarantena.", filename,
+                )
+                self._quarantine_passive_invoice(
+                    xml_bytes, filename, company,
+                    reason="_l10n_it_edi_import_invoices non disponibile",
                 )
                 return
+
             created_moves = moves._l10n_it_edi_import_invoices([attachment])
-
-            if created_moves:
-                _logger.info(
-                    "Fattura passiva importata con successo: %s → %s",
-                    filename,
-                    ', '.join(created_moves.mapped('name')),
-                )
-                for move in created_moves:
-                    move.message_post(
-                        body=_(
-                            "📥 Fattura fornitore importata automaticamente "
-                            "da PEC SDI: <code>%s</code>"
-                        ) % filename,
-                        message_type='notification',
-                        subtype_xmlid='mail.mt_note',
-                    )
-            else:
-                _logger.warning(
-                    "Importazione fattura passiva %s: nessuna fattura creata",
-                    filename,
-                )
-
         except Exception as e:
+            import_error = str(e)
             _logger.exception(
                 "Errore importazione fattura passiva %s: %s",
-                filename, str(e),
+                filename, import_error,
+            )
+
+        if not created_moves:
+            _logger.warning(
+                "Importazione fattura passiva %s: nessuna fattura creata",
+                filename,
+            )
+            self._quarantine_passive_invoice(
+                xml_bytes, filename, company,
+                reason=import_error or "nessuna fattura creata dall'import standard",
+            )
+            return
+
+        _logger.info(
+            "Fattura passiva importata con successo: %s → %s",
+            filename,
+            ', '.join(created_moves.mapped('name')),
+        )
+
+        for move in created_moves:
+            move.message_post(
+                body=_(
+                    "📥 Fattura fornitore importata automaticamente "
+                    "da PEC SDI: <code>%s</code>"
+                ) % filename,
+                message_type='notification',
+                subtype_xmlid='mail.mt_note',
+            )
+
+            # ── Allegato .eml per conservazione/audit ─────────────────
+            if raw_email:
+                try:
+                    eml_name = self._build_eml_filename(filename, subject)
+                    self.env['ir.attachment'].create({
+                        'name': eml_name,
+                        'raw': raw_email if isinstance(raw_email, bytes) else raw_email.encode('utf-8'),
+                        'mimetype': 'message/rfc822',
+                        'res_model': 'account.move',
+                        'res_id': move.id,
+                    })
+                except Exception as e:
+                    _logger.warning(
+                        "Impossibile allegare .eml originale alla fattura "
+                        "%s: %s", move.name or move.id, e,
+                    )
+
+    def _build_eml_filename(self, xml_filename, subject):
+        """Costruisce un nome file per l'archivio .eml del messaggio PEC."""
+        base = xml_filename.rsplit('.xml', 1)[0]
+        return f"{base}_pec.eml"
+
+    def _quarantine_passive_invoice(self, xml_bytes, filename, company, reason):
+        """
+        Salva l'XML come attachment "orfano" con un tag di quarantena.
+
+        Non viene collegato a nessuna account.move (res_model/res_id
+        lasciati vuoti) così resta visibile nell'area allegati e può
+        essere ispezionato manualmente. Evita la perdita definitiva
+        del documento quando il motore di import standard fallisce.
+        """
+        try:
+            self.env['ir.attachment'].create({
+                'name': f"QUARANTINE_{filename}",
+                'raw': xml_bytes,
+                'mimetype': 'application/xml',
+                'description': _(
+                    "Fattura passiva PEC in quarantena (company: %(company)s). "
+                    "Motivo: %(reason)s"
+                ) % {'company': company.name, 'reason': reason},
+            })
+            _logger.warning(
+                "Fattura passiva %s posta in quarantena (company %s): %s",
+                filename, company.name, reason,
+            )
+        except Exception as e:
+            _logger.exception(
+                "Impossibile mettere in quarantena la fattura passiva %s: %s",
+                filename, e,
             )
