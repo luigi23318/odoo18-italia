@@ -117,6 +117,49 @@ class TestPecAccountMove(TransactionCase):
             'country_id': cls.env.ref('base.it').id,
         })
 
+    def setUp(self):
+        """Patch del metodo standard Odoo `_l10n_it_edi_write_send_state`.
+
+        Why: il metodo standard esegue `self.env.cr.commit()` internamente
+        (l10n_it_edi/models/account_move.py:1853), cosa vietata durante
+        i test Odoo perché romperebbe la transazione di rollback. Lo
+        sostituiamo con una versione "safe for tests" che scrive gli
+        stessi campi (`l10n_it_edi_state`, `l10n_it_edi_transaction`)
+        direttamente sul record, senza committare e senza postare sul
+        chatter (quest'ultimo non ci interessa per le assertion).
+
+        Il patch vive per la durata del singolo test e viene rimosso
+        automaticamente da `addCleanup` al termine, così non inquina
+        altri test né il codice di produzione.
+        """
+        super().setUp()
+
+        def _fake_write_send_state(move_self, transformed_notification, message=None):
+            """Sostituto test-safe di _l10n_it_edi_write_send_state.
+
+            Riproduce il contratto minimo atteso dai test:
+            - scrive i campi `l10n_it_edi_state` e `l10n_it_edi_transaction`
+              dalla notifica trasformata
+            - NON committa (è vietato nei test)
+            - NON posta sul chatter (non serve alle assertion)
+            """
+            vals = {}
+            if 'l10n_it_edi_state' in transformed_notification:
+                vals['l10n_it_edi_state'] = transformed_notification['l10n_it_edi_state']
+            if 'l10n_it_edi_transaction' in transformed_notification:
+                vals['l10n_it_edi_transaction'] = transformed_notification['l10n_it_edi_transaction']
+            if vals:
+                move_self.write(vals)
+
+        patcher = patch.object(
+            type(self.env['account.move']),
+            '_l10n_it_edi_write_send_state',
+            autospec=True,
+            side_effect=_fake_write_send_state,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_10_pec_is_active_demo(self):
         """_l10n_it_edi_pec_is_active() ritorna True in demo."""
         invoice = self._create_test_invoice()
