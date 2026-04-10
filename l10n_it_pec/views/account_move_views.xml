@@ -30,6 +30,7 @@
                 <div invisible="not l10n_it_pec_signature_required or move_type not in ('out_invoice', 'out_refund')">
                     <!-- Stato: in attesa di firma -->
                     <div class="alert alert-warning mb-0"
+                         role="alert"
                          invisible="l10n_it_pec_signature_state != 'awaiting'">
                         <strong>Firma digitale richiesta</strong> —
                         Fattura PA: scaricare l'XML, firmarlo e ricaricare.
@@ -37,6 +38,7 @@
 
                     <!-- Stato: firmato -->
                     <div class="alert alert-success mb-0"
+                         role="alert"
                          invisible="l10n_it_pec_signature_state != 'signed'">
                         <strong>Firmato digitalmente</strong> —
                         <field name="l10n_it_pec_signed_attachment_id" readonly="1" nolabel="1" class="d-inline"/>
