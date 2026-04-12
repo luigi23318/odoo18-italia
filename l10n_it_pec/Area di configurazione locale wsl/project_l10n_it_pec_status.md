@@ -4,7 +4,7 @@ description: Resoconto completo dello stato di sviluppo del modulo Odoo 18 per i
 type: project
 ---
 
-# l10n_it_pec — Stato sviluppo (aggiornato 2026-04-12)
+# l10n_it_pec — Stato sviluppo (aggiornato 2026-04-12, terza sessione del giorno)
 
 ## Obiettivo del modulo
 Modulo Odoo 18 CE che sostituisce il trasporto delle fatture elettroniche italiane (FatturaPA) verso lo SDI: **PEC invece del proxy IAP Odoo**. Il modulo cambia SOLO il layer di trasporto, delegando TUTTA la gestione degli stati EDI allo standard Odoo (`l10n_it_edi`).
@@ -235,16 +235,40 @@ Implementata la conservazione dell'`IdentificativoSdI` dal file metadati Fattura
 
 **Risultato verificato**: suite di test passa da 27 a 30 test eseguiti, tutti verdi. `l10n_it_pec: 36 tests, 0 failed, 0 error(s) of 30 tests`. Migrazione del campo nel DB confermata da `module l10n_it_pec: creating or updating database tables` nei log di update.
 
-**NON ancora testato sul cron reale**: la prossima fattura passiva che arriverà sulla casella PEC sarà la prima a essere processata dal nuovo flusso. Aspettativa: nei log apparirà una nuova riga `INFO ... IdentificativoSdI <numero> salvato su fattura IT...xml.p7m` e nella form della fattura importata il nuovo gruppo "Ricezione PEC SDI" sarà popolato. Se per caso il file metadati di Aruba avesse una struttura inaspettata, l'import procederebbe ma senza identifier, con log silenzioso — in quel caso da estendere il regex.
+**Verifica end-to-end sul cron reale (2026-04-12)**: la prima fattura passiva arrivata via PEC sulla casella `sdifatture@pec.it` dopo l'update del modulo è stata processata correttamente dal nuovo flusso. Il regex `SDI_IDENTIFIER_PATTERN` ha matchato il file metadati `_MT_NNN.xml` reale di Aruba al primo colpo, l'IdentificativoSdI è stato estratto, scritto sulla fattura importata, ed è visibile nel nuovo gruppo "Ricezione PEC SDI" del tab "Altre informazioni". **Non è stato necessario estendere il regex**: la prima implementazione era già corretta sui file metadati reali. Punto chiuso definitivamente.
+
+### Corretti (sessione 2026-04-12 — pomeriggio) — Cleanup DB orfano `date_range_account`
+Risolto il warning ricorrente che a ogni avvio di Odoo emetteva:
+```
+WARNING ... odoo.modules.graph: module date_range_account: not installable, skipped
+ERROR   ... odoo.modules.loading: Some modules are not loaded, some dependencies or manifest may be missing: ['date_range_account']
+```
+
+**Diagnosi vera (dopo varie ipotesi sbagliate)**: la cartella `date_range_account` non esisteva sul filesystem né dell'host né dentro il container. Nessun manifest di nessun modulo lo dichiarava come dipendenza. Eppure il warning compariva a ogni avvio. La causa era un **record orfano nella tabella `ir_module_module` del database**: in qualche momento del passato il modulo era stato installato (probabilmente come parte di un repo OCA `account-financial-reporting` o simile), poi la cartella era stata rimossa dal filesystem (durante un upgrade del repo o una migrazione), ma il record nel DB era rimasto a stato `installed` con `latest_version = 18.0.1.0.0`. A ogni avvio Odoo costruiva il grafo dei moduli partendo da quel record fantasma, non trovava la cartella corrispondente, e bestemmiava.
+
+**Fix applicato**: cancellazione del record orfano dal DB in transazione SQL singola (`BEGIN/COMMIT`), in 5 passi atomici:
+1. `DELETE FROM ir_ui_menu` per le 4 voci di menu collegate
+2. `DELETE FROM ir_model_access` per i 3 permessi ACL collegati
+3. `DELETE FROM ir_model_data WHERE module = 'date_range_account'` per i 7 metadati associati
+4. `UPDATE ir_module_module SET state = 'uninstalled'` come passaggio buffer per coerenza
+5. `DELETE FROM ir_module_module WHERE name = 'date_range_account'` per il record principale
+
+Tutto in un blocco `BEGIN; ... COMMIT;` con verifica finale `SELECT COUNT(*)` integrata, così se qualcosa fosse andato storto la transazione veniva rollbackata automaticamente. Backup precauzionale di `ir_module_module` e `ir_model_data` salvato in `/home/odoo/backup_pre_date_range_account_cleanup.sql` prima di toccare niente.
+
+**Verifica preliminare (prima di toccare il DB)**: query `information_schema.columns` per cercare colonne residue su tabelle di account: trovate 9 colonne `*date_range*` ma TUTTE appartenenti al modulo `date_range` "padre" (che è installato e funzionante) o al core Odoo, NESSUNA del modulo `date_range_account`. Confermato che il cleanup non avrebbe lasciato colonne orfane su `account_move` o simili.
+
+**Risultato verificato**: dopo restart del container e nuovo run completo dei test (`docker compose exec odoo odoo -d odoo18 -u l10n_it_pec --test-enable --stop-after-init ...`), nei log NON compare più né il `WARNING ... module date_range_account: not installable, skipped` né l'`ERROR ... Some modules are not loaded`. Suite test verde: `l10n_it_pec: 36 tests, 0 failed, 0 error(s) of 30 tests`.
+
+**Note sulla diagnosi sbagliata iniziale**: la prima ipotesi era che `date_range_account` fosse un modulo "rotto" sul filesystem con dipendenze mancanti (causa A o B). Diversi `find` e `grep` ricorsivi hanno smontato questa ipotesi, ma fino al momento in cui non abbiamo controllato il DB direttamente non avevamo visto il record orfano. Lezione: quando Odoo si lamenta di un modulo "not installable", controllare SEMPRE prima `ir_module_module` nel DB, non solo il filesystem. Il messaggio di errore è leggermente fuorviante (parla di "dipendenze mancanti" anche quando in realtà è un record orfano).
 
 ### Da fare (prossimi passi)
 - **Test firma digitale PA**: verificare flusso download XML, upload .p7m firmato, invio PEC con file firmato (non ancora testato end-to-end su istanza reale). Richiede una fattura vera verso un ente PA e un certificato di firma digitale qualificata. Rimandabile finché non emerge un cliente OdooManager.cloud che fattura a enti pubblici.
-- **Verifica reale dell'IdentificativoSdI sul cron** alla prossima fattura passiva in arrivo. Se l'identifier viene scritto correttamente, considerare il punto chiuso definitivamente. Se non viene scritto, esaminare il file metadati ricevuto per vedere se serve estendere `SDI_IDENTIFIER_PATTERN`.
-- **Sistemare `date_range_account`** nell'ambiente Docker — modulo OCA che emette errore `Some modules are not loaded, some dependencies or manifest may be missing` a ogni caricamento. NON è del nostro modulo e NON blocca nulla, ma sporca i log. Da valutare se sistemare o rimuovere il modulo dal filesystem.
+- **Warning cosmetico font Courier**: Odoo logga `Warn: Can't find .pfb for face 'Courier'` a ogni avvio (warning di `wkhtmltopdf`, non blocca generazione PDF). Identico in spirito al fix di `date_range_account`: residuo dell'immagine Docker, da sistemare solo per pulizia. Non urgente.
 - **Considerazioni operative (da documentare nel runbook OdooManager.cloud, non nel codice):**
   - Il cron filtra i messaggi PEC con `UNSEEN FROM "@pec.fatturapa.it"`. Se un operatore apre la webmail PEC del cliente e clicca su un messaggio SDI, questo diventa `\Seen` e il cron **non lo importerà più** — la dedup comunque protegge da import duplicati se questo succede al contrario.
   - Il polling IMAP gira in sequenza su tutte le company con PEC attiva. Con molte company (50+) potrebbe diventare un collo di bottiglia — da monitorare se si scala.
-  - Per i comandi di test/admin che toccano il DB, usare sempre `-e PGPASSWORD=$(grep POSTGRES_PASSWORD /home/odoo/odoo-docker/.env | cut -d= -f2)` con uno spazio iniziale, così la password non finisce mai in chiaro né nella history bash né nei log della chat.
+  - Per i comandi di test/admin che toccano il DB, usare sempre `-e PGPASSWORD=$(grep POSTGRES_PASSWORD /home/odoo/odoo-docker/.env | cut -d= -f2)` con uno spazio iniziale, così la password non finisce mai in chiaro né nella history bash né nei log della chat. Aggiungere `-T` quando il comando dentro `exec` ha I/O redirezionato (heredoc, pipe, `>`, `<`).
+  - Quando si lanciano comandi `docker compose`, **andare prima nella cartella `/home/odoo/odoo-docker/`** (dove sta il file `docker-compose.yml`), altrimenti `docker compose` non trova la configurazione e fallisce con `no configuration file provided: not found`.
 
 ### Feature: Firma digitale fatture PA (aggiunta 2026-04-01)
 Flusso manuale download/upload per firma digitale qualificata delle fatture PA (obbligatoria per legge).
