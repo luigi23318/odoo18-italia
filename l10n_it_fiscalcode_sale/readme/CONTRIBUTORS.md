@@ -1,3 +1,0 @@
-- Lorenzo Battistini ([TAKOBI](https://takobi.online))
-- [Nextev Srl](https://www.nextev.it)
-- Alex Comba alex.comba@agilebg.com (https://www.agilebg.com/)

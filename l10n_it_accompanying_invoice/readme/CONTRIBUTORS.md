@@ -1,3 +1,0 @@
-- Lorenzo Battistini \<<lorenzo.battistini@agilebg.com>\>
-- Simone Vanin \<<simone.vanin@agilebg.com>\>
-- Simone Rubino \<<simone.rubino88@gmail.com>\>
