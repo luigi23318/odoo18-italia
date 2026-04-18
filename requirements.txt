@@ -1,0 +1,7 @@
+unidecode
+codicefiscale
+asn1crypto
+python-stdnum
+openupgradelib
+xlsxwriter
+
