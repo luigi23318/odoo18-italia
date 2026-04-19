@@ -12,9 +12,9 @@
                 <IdPaese>IT</IdPaese>
                 <IdCodice>01234560157</IdCodice>
             </IdTrasmittente>
-            <ProgressivoInvio>V202400001</ProgressivoInvio>
+            <ProgressivoInvio>V201900001</ProgressivoInvio>
             <FormatoTrasmissione>FPR12</FormatoTrasmissione>
-            <CodiceDestinatario>XXXXXXX</CodiceDestinatario>
+            <CodiceDestinatario>0000000</CodiceDestinatario>
             <ContattiTrasmittente>
                 <Telefono>0266766700</Telefono>
                 <Email>test@test.it</Email>
@@ -42,18 +42,19 @@
         <CessionarioCommittente>
             <DatiAnagrafici>
                 <IdFiscaleIVA>
-                    <IdPaese>US</IdPaese>
-                    <IdCodice>OO99999999999</IdCodice>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>00465840031</IdCodice>
                 </IdFiscaleIVA>
+                <CodiceFiscale>93026890017</CodiceFiscale>
                 <Anagrafica>
-                    <Denominazione>US Partner</Denominazione>
+                    <Denominazione>Alessi</Denominazione>
                 </Anagrafica>
             </DatiAnagrafici>
             <Sede>
-                <Indirizzo>123 Rainbow Road</Indirizzo>
-                <CAP>00000</CAP>
-                <Comune>Test city</Comune>
-                <Nazione>US</Nazione>
+                <Indirizzo>Via Privata Alessi 6</Indirizzo>
+                <CAP>28887</CAP>
+                <Comune>Milan</Comune>
+                <Nazione>IT</Nazione>
             </Sede>
         </CessionarioCommittente>
     </FatturaElettronicaHeader>
@@ -62,49 +63,43 @@
             <DatiGeneraliDocumento>
                 <TipoDocumento>TD01</TipoDocumento>
                 <Divisa>EUR</Divisa>
-                <Data>2024-08-07</Data>
-                <Numero>INV/2024/00001</Numero>
-                <ImportoTotaleDocumento>990.00</ImportoTotaleDocumento>
+                <Data>2019-01-01</Data>
+                <Numero>INV/2019/00001</Numero>
+                <ImportoTotaleDocumento>122.00</ImportoTotaleDocumento>
             </DatiGeneraliDocumento>
         </DatiGenerali>
         <DatiBeniServizi>
             <DettaglioLinee>
                 <NumeroLinea>1</NumeroLinea>
-                <Descrizione>A productive product</Descrizione>
+                <Descrizione>test line</Descrizione>
                 <Quantita>1.00</Quantita>
-                <PrezzoUnitario>989.99907313</PrezzoUnitario>
-                <PrezzoTotale>989.99907313</PrezzoTotale>
-                <AliquotaIVA>0.00</AliquotaIVA>
-                <Natura>N3.1</Natura>
+                <PrezzoUnitario>100.00000000</PrezzoUnitario>
+                <PrezzoTotale>100.00000000</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
                 <AltriDatiGestionali>
-                    <TipoDato>DIVISA</TipoDato>
-                    <RiferimentoTesto>USD</RiferimentoTesto>
-                    <RiferimentoNumero>1068.11000000</RiferimentoNumero>
+                    <TipoDato>CODLAV</TipoDato>
+                    <RiferimentoTesto>LAV123</RiferimentoTesto>
                 </AltriDatiGestionali>
                 <AltriDatiGestionali>
-                    <TipoDato>CAMBIO</TipoDato>
-                    <RiferimentoNumero>1.07890000</RiferimentoNumero>
-                    <RiferimentoData>2024-08-07</RiferimentoData>
+                    <TipoDato>NUMORD</TipoDato>
+                    <RiferimentoNumero>12345.67000000</RiferimentoNumero>
+                    <RiferimentoData>2024-06-15</RiferimentoData>
                 </AltriDatiGestionali>
             </DettaglioLinee>
             <DatiRiepilogo>
-                <AliquotaIVA>0.00</AliquotaIVA>
-                <Natura>N3.1</Natura>
-                <Arrotondamento>0.00092687</Arrotondamento>
-                <ImponibileImporto>990.00</ImponibileImporto>
-                <Imposta>0.00</Imposta>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <ImponibileImporto>100.00</ImponibileImporto>
+                <Imposta>22.00</Imposta>
                 <EsigibilitaIVA>I</EsigibilitaIVA>
-                <RiferimentoNormativo
-                >Art. 8, c.1, lett.a - D.P.R. 633/1972</RiferimentoNormativo>
             </DatiRiepilogo>
         </DatiBeniServizi>
         <DatiPagamento>
             <CondizioniPagamento>TP02</CondizioniPagamento>
             <DettaglioPagamento>
                 <ModalitaPagamento>MP05</ModalitaPagamento>
-                <DataScadenzaPagamento>2024-08-07</DataScadenzaPagamento>
-                <ImportoPagamento>1068.11</ImportoPagamento>
-                <CodicePagamento>INV/2024/00001</CodicePagamento>
+                <DataScadenzaPagamento>2019-01-01</DataScadenzaPagamento>
+                <ImportoPagamento>122.00</ImportoPagamento>
+                <CodicePagamento>INV/2019/00001</CodicePagamento>
             </DettaglioPagamento>
         </DatiPagamento>
     </FatturaElettronicaBody>
