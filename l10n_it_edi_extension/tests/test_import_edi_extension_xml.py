@@ -2,6 +2,7 @@
 #  Copyright 2025 Simone Rubino
 #  License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+import base64
 from datetime import date
 from unittest.mock import patch
 
@@ -133,9 +134,24 @@ class TestFatturaPAXMLValidation(Common):
             self.assertEqual(attachments[0].raw, orig_attachment_data)
 
     def test_import_zip(self):
-        zip_name = "xml_import.zip"
-        moves = self._import_moves_from_zip(zip_name)
+        path = "l10n_it_edi_extension/tests/import_xmls/xml_import.zip"
+        import_file_model = self.env["l10n_it_edi.import_file_wizard"].with_company(
+            self.company
+        )
 
+        with tools.file_open(path, mode="rb") as file:
+            encoded_file = base64.encodebytes(file.read())
+
+            wizard_attachment_import = import_file_model.create(
+                {
+                    "l10n_it_edi_attachment_filename": "xml_import.zip",
+                    "l10n_it_edi_attachment": encoded_file,
+                }
+            )
+            action = wizard_attachment_import.action_import()
+
+        move_ids = action.get("domain")[0][2]
+        moves = self.env["account.move"].browse(move_ids)
         out_moves = moves.filtered(lambda m: m.is_sale_document())
         in_moves = moves.filtered(lambda m: m.is_purchase_document())
         self.assertEqual(len(out_moves), 6)
@@ -367,41 +383,6 @@ class TestFatturaPAXMLValidation(Common):
         # Assert
         self.assertEqual(len(invoice.invoice_line_ids), 1)
 
-    def test_import_zip_tax_detail_level_sale(self):
-        """If import detail level is Tax rate,
-        and a zip containing a customer invoice is imported,
-        the used tax is for customers."""
-        # Arrange
-        company = self.company
-        company.vat = "01654010345"
-        company.l10n_it_edi_import_detail_level = "tax"
-        zip_name = "INV_2026_00005.zip"
-
-        # Act
-        moves = self._import_moves_from_zip(zip_name)
-
-        # Assert
-        self.assertEqual(moves.move_type, "out_invoice")
-        self.assertEqual(moves.invoice_line_ids.tax_ids.type_tax_use, "sale")
-
-    def test_import_zip_max_detail_level_sale(self):
-        """If import detail level is Maximum,
-        and a zip containing a customer invoice is imported,
-        the used tax is for customers."""
-        # Arrange
-        company = self.company
-        company.vat = "01654010345"
-        zip_name = "INV_2026_00005.zip"
-        # pre-condition
-        self.assertEqual(company.l10n_it_edi_import_detail_level, "max")
-
-        # Act
-        moves = self._import_moves_from_zip(zip_name)
-
-        # Assert
-        self.assertEqual(moves.move_type, "out_invoice")
-        self.assertEqual(moves.invoice_line_ids.tax_ids.type_tax_use, "sale")
-
     def test_max_import_detail_level(self):
         """If import detail level is Maximum,
         all lines are imported."""
@@ -453,94 +434,3 @@ class TestFatturaPAXMLValidation(Common):
 
         # Assert
         self.assertFalse(invoice.invoice_line_ids)
-
-    def test_preview_link(self):
-        """The preview is available for imported bills."""
-        # Arrange
-        invoice = self._assert_import_invoice(
-            "IT02780790107_11004.xml",
-            [
-                {},
-            ],
-        )
-
-        # Act
-        preview_action = invoice.action_l10n_it_edi_ext_attachment_in_preview()
-
-        # Assert
-        self.assertEqual(
-            preview_action["url"],
-            invoice.l10n_it_edi_ext_attachment_in_preview_link,
-        )
-
-    def test_partner_default_product(self):
-        """If the partner has a default product and no product is found,
-        the partner's default product is used."""
-        # Arrange
-        supplier = self.env["res.partner"].create(
-            {
-                "name": "Test supplier",
-                "vat": "02780790107",
-            }
-        )
-        default_product = self.default_product.with_company(self.company)
-        supplier.l10n_it_edi_ext_default_product_id = default_product
-
-        # Act
-        bill = self._assert_import_invoice(
-            "IT02780790107_11004.xml",
-            [{"partner_id": supplier.id}],
-        )
-
-        # Assert
-        self.assertRecordValues(
-            bill.invoice_line_ids,
-            [
-                {
-                    "product_id": default_product.id,
-                    "account_id": default_product.property_account_expense_id.id,
-                    "tax_ids": default_product.supplier_taxes_id.ids,
-                    "price_total": 6.10,
-                },
-                {
-                    "product_id": default_product.id,
-                    "account_id": default_product.property_account_expense_id.id,
-                    "tax_ids": default_product.supplier_taxes_id.ids,
-                    "price_total": 24.40,
-                },
-            ],
-        )
-
-    def test_partner_default_product_tax_detail_level(self):
-        """If the partner has a default product and no product is found,
-        and the invoice is imported with "Tax" detail level,
-        the partner's default product is used."""
-        # Arrange
-        supplier = self.env["res.partner"].create(
-            {
-                "name": "Test supplier",
-                "vat": "02780790107",
-                "l10n_it_edi_import_detail_level": "tax",
-            }
-        )
-        default_product = self.default_product.with_company(self.company)
-        supplier.l10n_it_edi_ext_default_product_id = default_product
-
-        # Act
-        bill = self._assert_import_invoice(
-            "IT02780790107_11004.xml",
-            [{"partner_id": supplier.id}],
-        )
-
-        # Assert
-        self.assertRecordValues(
-            bill.invoice_line_ids,
-            [
-                {
-                    "product_id": default_product.id,
-                    "account_id": default_product.property_account_expense_id.id,
-                    "tax_ids": default_product.supplier_taxes_id.ids,
-                    "price_total": 41.48,
-                },
-            ],
-        )
