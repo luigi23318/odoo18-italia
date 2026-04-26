@@ -376,32 +376,7 @@ class AccountMove(models.Model):
     # ══════════════════════════════════════════════════════════════════
     #  Generazione XML e invio PEC
     # ══════════════════════════════════════════════════════════════════
-
-    # ══════════════════════════════════════════════════════════════════
-    #  Override generazione valori XML FatturaPA
-    # ══════════════════════════════════════════════════════════════════
-
-    def _l10n_it_edi_get_values(self, pdf_values=None):
-        """
-        Fix <ImportoTotaleDocumento> per contributo cassa previdenziale.
-
-        Odoo 18 standard (l10n_it_edi/models/account_move.py riga 563-569)
-        calcola importo_totale_documento sommando solo base_amount + tax_amount
-        dei DatiRiepilogo IVA, escludendo il contributo cassa previdenziale
-        (TC01-TC22) che viene scritto nel blocco separato
-        <DatiCassaPrevidenziale>. Risultato: totale XML inferiore al totale
-        reale del documento, con potenziale errore 00422 in fase di
-        controllo SDI su fatture con cassa previdenziale.
-
-        Forziamo il valore a self.amount_total che somma correttamente
-        imponibile + IVA + contributo cassa + bollo, coerente con l'UI
-        Odoo e con il PDF generato.
-        """
-        values = super()._l10n_it_edi_get_values(pdf_values)
-        if self.amount_total:
-            values['importo_totale_documento'] = self.amount_total
-        return values    
-
+    
     def _l10n_it_pec_generate_xml(self):
         """
         Genera l'XML FatturaPA riutilizzando il motore standard di l10n_it_edi.
