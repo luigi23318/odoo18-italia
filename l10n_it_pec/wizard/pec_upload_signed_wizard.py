@@ -62,9 +62,17 @@ class PecUploadSignedWizard(models.TransientModel):
                     received=base_name,
                 ))
 
-        # Rimuovere eventuale attachment firmato precedente
-        if self.move_id.l10n_it_pec_signed_attachment_id:
-            self.move_id.l10n_it_pec_signed_attachment_id.unlink()
+        # Rimuovere eventuale attachment firmato precedente (solo scollega)
+        self.move_id.l10n_it_pec_signed_attachment_id = False
+
+        # Rimuovere l'XML generato per il download (non serve più, c'è il .p7m)
+        self.move_id.write({
+            'l10n_it_pec_xml_attachment_id': False,
+            'l10n_it_edi_attachment_file': False,
+        })
+        self.move_id.invalidate_recordset(
+            fnames=['l10n_it_edi_attachment_id', 'l10n_it_edi_attachment_file']
+        )
 
         attachment = self.env['ir.attachment'].create({
             'name': filename,
@@ -76,7 +84,8 @@ class PecUploadSignedWizard(models.TransientModel):
 
         self.move_id.l10n_it_pec_signed_attachment_id = attachment.id
 
-        return {'type': 'ir.actions.act_window_close'}
+        # Reload per aggiornare la vista allegati
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
 
     def _get_expected_xml_filename(self):
         """Recupera il filename XML atteso dalla fattura."""

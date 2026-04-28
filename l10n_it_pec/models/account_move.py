@@ -66,13 +66,13 @@ class AccountMove(models.Model):
         help="File XML firmato digitalmente (CAdES .p7m o XAdES .xml) da inviare allo SDI",
     )
     l10n_it_pec_signature_required = fields.Boolean(
-        string="Firma digitale richiesta",
+        string="Firma digitale disponibile",
         compute='_compute_l10n_it_pec_signature_required',
-        help="True se la fattura è destinata alla PA e richiede firma digitale",
+        help="True per tutte le fatture di vendita: la firma è sempre disponibile",
     )
     l10n_it_pec_signature_state = fields.Selection(
         selection=[
-            ('not_required', 'Non richiesta'),
+            ('not_applicable', 'Non applicabile'),
             ('awaiting', 'In attesa di firma'),
             ('signed', 'Firmato'),
         ],
@@ -91,16 +91,87 @@ class AccountMove(models.Model):
              "fornitore.",
     )
 
+    # ── Reset stato EDI (solo modalità test) ─────────────────────────
+    l10n_it_pec_show_reset_edi = fields.Boolean(
+        compute='_compute_l10n_it_pec_show_reset_edi',
+    )
+
+    @api.depends('l10n_it_edi_transaction', 'state')
+    def _compute_l10n_it_pec_show_reset_edi(self):
+        for move in self:
+            move.l10n_it_pec_show_reset_edi = (
+                move.company_id.l10n_it_edi_pec_mode == 'test'
+                and move.state == 'posted'
+                and bool(move.l10n_it_edi_transaction)
+            )
+
+    def action_l10n_it_pec_reset_edi(self):
+        """Resetta lo stato EDI per consentire il ritorno a bozza.
+        Disponibile solo in modalità test PEC."""
+        self.ensure_one()
+        if self.company_id.l10n_it_edi_pec_mode != 'test':
+            raise UserError(_(
+                "L'annullamento dello stato EDI è consentito solo in modalità test."
+            ))
+        # Raccogli gli ID degli allegati da eliminare PRIMA di scollegarli
+        att_ids = set()
+        if self.l10n_it_pec_signed_attachment_id:
+            att_ids.add(self.l10n_it_pec_signed_attachment_id.id)
+        if self.l10n_it_pec_xml_attachment_id:
+            att_ids.add(self.l10n_it_pec_xml_attachment_id.id)
+        if self.l10n_it_edi_attachment_id:
+            att_ids.add(self.l10n_it_edi_attachment_id.id)
+
+        # Cerca anche tutti gli allegati XML e PDF generati per questa fattura
+        all_attachments = self.env['ir.attachment'].search([
+            ('res_model', '=', 'account.move'),
+            ('res_id', '=', self.id),
+            '|', '|', '|',
+            ('name', '=like', 'IT%.xml'),
+            ('name', '=like', 'IT%.xml.p7m'),
+            ('name', '=like', '%.pdf'),
+            ('mimetype', '=', 'application/xml'),
+        ])
+        for att in all_attachments:
+            att_ids.add(att.id)
+
+        # Scollega PRIMA i riferimenti Many2one
+        self.write({
+            'l10n_it_pec_signed_attachment_id': False,
+            'l10n_it_pec_xml_attachment_id': False,
+        })
+
+        # Elimina gli attachment (ora non più referenziati)
+        if att_ids:
+            self.env['ir.attachment'].sudo().browse(list(att_ids)).unlink()
+
+        # DOPO l'eliminazione, resetta i campi EDI e PEC
+        self.write({
+            'l10n_it_edi_state': False,
+            'l10n_it_edi_transaction': False,
+            'l10n_it_edi_header': False,
+            'l10n_it_edi_attachment_file': False,
+            'invoice_pdf_report_file': False,
+            'l10n_it_pec_sent_date': False,
+            'l10n_it_pec_message_id': False,
+            'l10n_it_pec_last_error': False,
+        })
+        self.invalidate_recordset(fnames=[
+            'l10n_it_edi_attachment_id', 'l10n_it_edi_attachment_file',
+            'invoice_pdf_report_file', 'invoice_pdf_report_id',
+        ])
+        self.message_post(
+            body=_("Stato EDI resettato manualmente (modalità test). "
+                   "La fattura può ora essere riportata a bozza.")
+        )
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
     # ══════════════════════════════════════════════════════════════════
     #  Reset campi PEC quando si torna in bozza
     # ══════════════════════════════════════════════════════════════════
 
     def button_draft(self):
         """Pulisce i campi PEC quando la fattura torna in bozza."""
-        # Rimuove file firmato (l'XML potrebbe cambiare dopo ri-conferma)
-        for move in self:
-            if move.l10n_it_pec_signed_attachment_id:
-                move.l10n_it_pec_signed_attachment_id.unlink()
         res = super().button_draft()
         self.write({
             'l10n_it_pec_sent_date': False,
@@ -112,19 +183,22 @@ class AccountMove(models.Model):
         return res
 
     # ══════════════════════════════════════════════════════════════════
-    #  Firma digitale PA
+    #  Firma digitale (disponibile per tutte le fatture di vendita)
     # ══════════════════════════════════════════════════════════════════
 
-    @api.depends('commercial_partner_id.l10n_it_pa_index')
+    @api.depends('move_type', 'state')
     def _compute_l10n_it_pec_signature_required(self):
         for move in self:
-            move.l10n_it_pec_signature_required = move._l10n_it_pec_is_pa_invoice()
+            move.l10n_it_pec_signature_required = (
+                move.move_type in ('out_invoice', 'out_refund')
+                and move.state == 'posted'
+            )
 
     @api.depends('l10n_it_pec_signature_required', 'l10n_it_pec_signed_attachment_id')
     def _compute_l10n_it_pec_signature_state(self):
         for move in self:
             if not move.l10n_it_pec_signature_required:
-                move.l10n_it_pec_signature_state = 'not_required'
+                move.l10n_it_pec_signature_state = 'not_applicable'
             elif move.l10n_it_pec_signed_attachment_id:
                 move.l10n_it_pec_signature_state = 'signed'
             else:
@@ -139,17 +213,30 @@ class AccountMove(models.Model):
         return bool(pa_index) and len(pa_index) == 6 and pa_index.isalnum() and pa_index.isupper()
 
     def action_l10n_it_pec_download_xml(self):
-        """Scarica l'XML della fattura per la firma digitale in locale."""
+        """Scarica l'XML della fattura per la firma digitale in locale.
+        Se l'XML non è ancora stato generato, lo genera al volo."""
         self.ensure_one()
-        attachment = self.env['ir.attachment'].search([
-            ('res_model', '=', 'account.move'),
-            ('res_id', '=', self.id),
-            ('name', '=like', 'IT%.xml'),
-        ], limit=1, order='create_date desc')
+        # Cerca attachment XML esistente (standard EDI o PEC)
+        attachment = self.l10n_it_edi_attachment_id
+        if not attachment:
+            attachment = self.l10n_it_pec_xml_attachment_id
+        if not attachment:
+            attachment = self.env['ir.attachment'].search([
+                ('res_model', '=', 'account.move'),
+                ('res_id', '=', self.id),
+                ('name', '=like', 'IT%.xml'),
+            ], limit=1, order='create_date desc')
 
         if not attachment:
-            raise UserError(_("Nessun file XML trovato per questa fattura. "
-                              "Generare prima il file XML tramite 'Invia e Stampa'."))
+            # Genera l'XML e crea l'attachment standard EDI
+            if errors := self._l10n_it_edi_export_data_check():
+                messages = []
+                for error_key, error_data in errors.items():
+                    messages.append(error_data['message'])
+                raise UserError('\n'.join(messages))
+            attachment_vals = self._l10n_it_edi_get_attachment_values(pdf_values=None)
+            attachment = self.env['ir.attachment'].create(attachment_vals)
+            self.invalidate_recordset(fnames=['l10n_it_edi_attachment_id', 'l10n_it_edi_attachment_file'])
 
         return {
             'type': 'ir.actions.act_url',
@@ -170,11 +257,84 @@ class AccountMove(models.Model):
         }
 
     def action_l10n_it_pec_remove_signed(self):
-        """Rimuove il file XML firmato per consentire un nuovo upload."""
+        """Rimuove il file XML firmato e l'XML generato per il download."""
         self.ensure_one()
+        # Raccogli gli attachment da eliminare
+        to_delete = self.env['ir.attachment']
         if self.l10n_it_pec_signed_attachment_id:
-            self.l10n_it_pec_signed_attachment_id.unlink()
-            self.l10n_it_pec_signed_attachment_id = False
+            to_delete |= self.l10n_it_pec_signed_attachment_id
+        # Scollega i campi PRIMA dell'unlink
+        self.write({
+            'l10n_it_pec_signed_attachment_id': False,
+            'l10n_it_pec_xml_attachment_id': False,
+            'l10n_it_edi_attachment_file': False,
+        })
+        self.invalidate_recordset(fnames=['l10n_it_edi_attachment_id', 'l10n_it_edi_attachment_file'])
+        # Elimina gli attachment
+        if to_delete:
+            to_delete.sudo().unlink()
+        # Ricarica la pagina per evitare crash JS
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Override nome file XML: Codice Fiscale o Partita IVA
+    # ══════════════════════════════════════════════════════════════════
+
+    def _l10n_it_edi_generate_filename(self):
+        """Override:
+        - Usa la Partita IVA nel filename se configurato nelle impostazioni PEC.
+        - In modalità test/demo, non incrementa il progressivo (usa l'ultimo).
+        """
+        company = self.company_id._l10n_it_get_edi_company()
+        is_test = company.l10n_it_edi_pec_mode in ('test', 'demo')
+
+        if company.l10n_it_pec_filename_id_type == 'partita_iva' or is_test:
+            a = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+            sequence = self.env['ir.sequence'].with_company(company).sudo().search([
+                ('code', '=', 'l10n_it_edi.fattura_filename'),
+                ('company_id', '=', company.id),
+            ], limit=1)
+
+            if not sequence:
+                offset = 62 ** 4
+                sequence = self.env['ir.sequence'].sudo().create({
+                    'name': 'FatturaPA Filename Sequence',
+                    'code': 'l10n_it_edi.fattura_filename',
+                    'company_id': company.id,
+                    'number_next': offset,
+                })
+
+            if is_test:
+                # In test/demo: usa il valore corrente SENZA incrementare
+                n = sequence.number_next_actual
+            else:
+                # In produzione: incrementa normalmente
+                n_str = sequence._next()
+                n = int(''.join(filter(lambda c: c.isdecimal(), n_str)))
+
+            if is_test:
+                # n è già un intero dal campo number_next_actual
+                pass
+            # Converti in base 62
+            progressive_number = ""
+            while n:
+                (n, m) = divmod(n, len(a))
+                progressive_number = a[m] + progressive_number
+
+            # Determina identificativo: Partita IVA o Codice Fiscale
+            if company.l10n_it_pec_filename_id_type == 'partita_iva':
+                codice = company.vat or ''
+                if codice.startswith(company.country_id.code or 'IT'):
+                    codice = codice[2:]
+            else:
+                codice = company.partner_id._l10n_it_edi_normalized_codice_fiscale()
+
+            return '%(country_code)s%(codice)s_%(progressive_number)s.xml' % {
+                'country_code': company.country_id.code,
+                'codice': codice,
+                'progressive_number': progressive_number.zfill(5),
+            }
+        return super()._l10n_it_edi_generate_filename()
 
     # ══════════════════════════════════════════════════════════════════
     #  CUORE OPZIONE C: Intercettazione del trasporto EDI
@@ -281,21 +441,10 @@ class AccountMove(models.Model):
             filename = attachment.get('name', '')
             xml_content = attachment.get('raw', b'')
 
-            # Firma digitale PA: stessa logica di _l10n_it_edi_upload
-            if move._l10n_it_pec_is_pa_invoice() and move.l10n_it_pec_signed_attachment_id:
+            # Firma digitale: se presente, usa il file firmato per il log
+            if move.l10n_it_pec_signed_attachment_id:
                 signed_att = move.l10n_it_pec_signed_attachment_id
                 send_filename = signed_att.name
-            elif move._l10n_it_pec_is_pa_invoice() and not move.l10n_it_pec_signed_attachment_id:
-                error_message = _(
-                    "Le fatture verso la PA richiedono la firma digitale. "
-                    "Scaricare l'XML, firmarlo e ricaricare il file firmato."
-                )
-                move.l10n_it_edi_header = error_message
-                move.sudo().message_post(body=error_message)
-                results[filename] = {
-                    'error_message': error_message,
-                }
-                continue
             else:
                 send_filename = filename
 
@@ -341,24 +490,15 @@ class AccountMove(models.Model):
         for file_data in (files or []):
             filename = file_data['filename']
 
-            # Firma digitale PA: sostituisci contenuto con file firmato
+            # Firma digitale: se presente, sostituisci contenuto con file firmato
             # Il filename originale è preservato come chiave nel dict dei risultati
             # perché il chiamante _l10n_it_edi_send() lo usa per il lookup.
-            if self._l10n_it_pec_is_pa_invoice() and self.l10n_it_pec_signed_attachment_id:
+            if self.l10n_it_pec_signed_attachment_id:
                 signed_att = self.l10n_it_pec_signed_attachment_id
                 file_data = dict(file_data,
                     filename=signed_att.name,
                     xml=signed_att.datas,
                 )
-            elif self._l10n_it_pec_is_pa_invoice() and not self.l10n_it_pec_signed_attachment_id:
-                results[filename] = {
-                    'error': _("Firma digitale richiesta"),
-                    'error_description': _(
-                        "Le fatture verso la PA richiedono la firma digitale. "
-                        "Scaricare l'XML, firmarlo e ricaricare il file firmato."
-                    ),
-                }
-                continue
 
             try:
                 self._l10n_it_pec_send_to_sdi(file_data)
@@ -380,12 +520,18 @@ class AccountMove(models.Model):
     def _l10n_it_pec_generate_xml(self):
         """
         Genera l'XML FatturaPA riutilizzando il motore standard di l10n_it_edi.
-        Salva l'XML come allegato sulla fattura.
+        Se l'attachment standard EDI esiste già, lo riusa per evitare duplicati.
 
         Usa _l10n_it_edi_render_xml() e _l10n_it_edi_generate_filename()
         definiti in l10n_it_edi/models/account_move.py.
         """
         self.ensure_one()
+
+        # Riusa l'attachment standard EDI se già presente
+        if self.l10n_it_edi_attachment_id:
+            attachment = self.l10n_it_edi_attachment_id
+            self.l10n_it_pec_xml_attachment_id = attachment
+            return attachment.raw, attachment.name
 
         xml_content = self._l10n_it_edi_render_xml()
         filename = self._l10n_it_edi_generate_filename()
@@ -415,15 +561,10 @@ class AccountMove(models.Model):
         xml_bytes = b64decode(file_data['xml'])
         mode = company.l10n_it_edi_pec_mode
 
-        # Salva l'XML come allegato PEC sulla fattura
-        attachment = self.env['ir.attachment'].create({
-            'name': filename,
-            'raw': xml_bytes,
-            'res_model': 'account.move',
-            'res_id': self.id,
-            'mimetype': 'application/xml',
-        })
-        self.l10n_it_pec_xml_attachment_id = attachment
+        # NON creare un attachment qui: l'XML è già disponibile in xml_bytes
+        # dal parametro file_data. Lo standard creerà l10n_it_edi_attachment_id
+        # dopo il ritorno di _l10n_it_edi_upload. Il campo l10n_it_pec_xml_attachment_id
+        # verrà assegnato nel post-invio quando l10n_it_edi_attachment_id è disponibile.
 
         # ── INVIO REALE (test / production) ───────────────────────────
         company._check_pec_configuration()
@@ -492,6 +633,11 @@ class AccountMove(models.Model):
                 _("La modalità PEC non è attiva. "
                   "Configurare in Impostazioni → Contabilità → PEC SDI.")
             )
+        if self.l10n_it_edi_transaction:
+            raise UserError(
+                _("La fattura è già stata inviata allo SDI (transaction: %s). "
+                  "Non è possibile inviarla di nuovo.", self.l10n_it_edi_transaction)
+            )
 
         # Validazione dati XML (stessa logica dello standard action_l10n_it_edi_send)
         if errors := self._l10n_it_edi_export_data_check():
@@ -501,42 +647,97 @@ class AccountMove(models.Model):
             self.l10n_it_edi_header = Markup('<br/>').join(messages)
             return {'type': 'ir.actions.client', 'tag': 'reload'}
 
-        # Crea attachment standard EDI (come lo standard, riga 247-248)
-        attachment_vals = self._l10n_it_edi_get_attachment_values(pdf_values=None)
-        self.env['ir.attachment'].create(attachment_vals)
-        self.invalidate_recordset(fnames=['l10n_it_edi_attachment_id', 'l10n_it_edi_attachment_file'])
-        self.message_post(attachment_ids=self.l10n_it_edi_attachment_id.ids)
+        # Prepara attachment_vals per _l10n_it_edi_send
+        # Regola: NON consumare mai un nuovo progressivo se esiste già un attachment
+        existing_att = self.l10n_it_edi_attachment_id
+        # Verifica che l'attachment esista realmente (potrebbe essere stato eliminato)
+        if existing_att and not existing_att.exists():
+            existing_att = False
+
+        if self.l10n_it_pec_signed_attachment_id:
+            # File firmato: usa quello per l'invio, l'XML base serve solo come
+            # chiave per _l10n_it_edi_send. Se esiste un attachment EDI lo riusa,
+            # altrimenti genera l'XML al volo senza consumare progressivo.
+            if existing_att:
+                attachment_vals = {
+                    'name': existing_att.name,
+                    'raw': existing_att.raw,
+                    'res_model': 'account.move',
+                    'res_id': self.id,
+                    'mimetype': 'application/xml',
+                }
+            else:
+                # Genera XML al volo senza progressivo (nome fittizio, verrà sostituito dal p7m)
+                xml_content = self._l10n_it_edi_render_xml()
+                signed_att = self.l10n_it_pec_signed_attachment_id
+                # Ricava il nome base dal file firmato (rimuovi .p7m)
+                base_name = signed_att.name
+                if base_name.lower().endswith('.p7m'):
+                    base_name = base_name[:-4]
+                attachment_vals = {
+                    'name': base_name,
+                    'raw': xml_content,
+                    'res_model': 'account.move',
+                    'res_id': self.id,
+                    'mimetype': 'application/xml',
+                }
+        else:
+            # Senza file firmato: usa o crea l'attachment standard EDI
+            if not existing_att:
+                attachment_vals = self._l10n_it_edi_get_attachment_values(pdf_values=None)
+            else:
+                attachment_vals = {
+                    'name': existing_att.name,
+                    'raw': existing_att.raw,
+                    'res_model': 'account.move',
+                    'res_id': self.id,
+                    'mimetype': 'application/xml',
+                }
 
         # Invio via flusso standard → _l10n_it_edi_upload → PEC
         self._l10n_it_edi_send({self: attachment_vals})
         self.is_move_sent = True
+        # Punta l10n_it_pec_xml_attachment_id all'attachment standard (no duplicati)
+        if self.l10n_it_edi_attachment_id:
+            self.l10n_it_pec_xml_attachment_id = self.l10n_it_edi_attachment_id
 
     def action_l10n_it_pec_preview_xml(self):
-        """Genera e mostra l'XML senza inviare."""
+        """Mostra l'XML della fattura nel browser senza scaricarlo."""
         self.ensure_one()
         if self.state != 'posted':
             raise UserError(_("La fattura deve essere confermata per generare l'XML."))
 
-        xml_content, filename = self._l10n_it_pec_generate_xml()
+        # Cerca attachment XML esistente
+        attachment = self.l10n_it_edi_attachment_id
+        if not attachment:
+            attachment = self.l10n_it_pec_xml_attachment_id
+        if not attachment:
+            attachment = self.env['ir.attachment'].search([
+                ('res_model', '=', 'account.move'),
+                ('res_id', '=', self.id),
+                ('name', '=like', 'IT%.xml'),
+            ], limit=1, order='create_date desc')
 
-        self.message_post(
-            body=_(
-                "👁 Anteprima XML generata: <code>%s</code> (%d bytes)"
-            ) % (filename, len(xml_content)),
-            message_type='notification',
-            subtype_xmlid='mail.mt_note',
-            attachment_ids=[self.l10n_it_pec_xml_attachment_id.id],
-        )
+        if not attachment:
+            # Genera l'XML al volo come attachment temporaneo (non legato alla fattura)
+            # per non creare allegati visibili e non consumare il progressivo
+            if errors := self._l10n_it_edi_export_data_check():
+                messages = []
+                for error_key, error_data in errors.items():
+                    messages.append(error_data['message'])
+                raise UserError('\n'.join(messages))
+            xml_content = self._l10n_it_edi_render_xml()
+            attachment = self.env['ir.attachment'].create({
+                'name': 'anteprima_fattura.xml',
+                'raw': xml_content,
+                'mimetype': 'application/xml',
+            })
 
+        # Apre l'XML nel browser (senza download)
         return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _("XML Generato"),
-                'message': _("File %s generato e allegato alla fattura.") % filename,
-                'type': 'success',
-                'sticky': False,
-            },
+            'type': 'ir.actions.act_url',
+            'url': f'/web/content/{attachment.id}',
+            'target': 'new',
         }
 
     # ══════════════════════════════════════════════════════════════════

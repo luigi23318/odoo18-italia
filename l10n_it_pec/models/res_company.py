@@ -90,6 +90,22 @@ class ResCompany(models.Model):
         help="Indirizzo PEC per l'ambiente di test SDI, se diverso.",
     )
 
+    # ── Opzioni nome file XML ─────────────────────────────────────────
+    l10n_it_pec_filename_id_type = fields.Selection(
+        selection=[
+            ('codice_fiscale', 'Codice Fiscale'),
+            ('partita_iva', 'Partita IVA'),
+        ],
+        string='Identificativo nel nome file XML',
+        default='codice_fiscale',
+        help=(
+            "Identificativo da usare nel nome del file XML FatturaPA.\n"
+            "Codice Fiscale: es. ITTRBLGU69S19G878E_00001.xml\n"
+            "Partita IVA: es. IT02614350698_00001.xml\n"
+            "Entrambi sono accettati dallo SDI."
+        ),
+    )
+
     # ── Bypass check proxy user per company che usano PEC ──────────────
     def _l10n_it_edi_export_check(self):
         errors = super()._l10n_it_edi_export_check()

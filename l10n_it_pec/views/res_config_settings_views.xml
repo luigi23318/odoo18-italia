@@ -96,6 +96,12 @@
                         </div>
                     </setting>
 
+                    <setting string="Identificativo nome file XML"
+                             invisible="not l10n_it_edi_pec_mode"
+                             help="Scegli se usare il Codice Fiscale o la Partita IVA nel nome del file XML">
+                        <field name="l10n_it_pec_filename_id_type" widget="radio"/>
+                    </setting>
+
                 </block>
             </xpath>
         </field>
