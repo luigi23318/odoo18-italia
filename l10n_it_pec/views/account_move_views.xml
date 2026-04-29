@@ -15,13 +15,13 @@
                         string="📨 Invia via PEC"
                         type="object"
                         class="btn-primary"
-                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund')"
+                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund') or l10n_it_pec_locked_sent"
                         groups="l10n_it_pec.group_pec_manager"/>
                 <button name="action_l10n_it_pec_preview_xml"
                         string="👁 Anteprima XML"
                         type="object"
                         class="btn-secondary"
-                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund')"
+                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund') or l10n_it_pec_locked_sent"
                         groups="l10n_it_pec.group_pec_manager"/>
                 <button name="action_l10n_it_pec_reset_edi"
                         string="⟲ Annulla invio EDI"
@@ -29,9 +29,10 @@
                         class="btn-secondary text-warning"
                         icon="fa-undo"
                         confirm="Resettare lo stato EDI di questa fattura? Dopo il reset sarà possibile riportarla a bozza."
-                        invisible="not l10n_it_pec_show_reset_edi"
+                        invisible="not l10n_it_pec_show_reset_edi or l10n_it_pec_locked_sent"
                         groups="l10n_it_pec.group_pec_manager"/>
                 <field name="l10n_it_pec_show_reset_edi" invisible="1"/>
+                <field name="l10n_it_pec_locked_sent" invisible="1"/>
             </xpath>
 
             <!-- Blocco firma digitale -->
@@ -73,7 +74,7 @@
                                 class="btn-link text-danger"
                                 icon="fa-trash"
                                 confirm="Rimuovere il file firmato?"
-                                invisible="l10n_it_pec_signature_state != 'signed'"/>
+                                invisible="l10n_it_pec_signature_state != 'signed' or l10n_it_pec_locked_sent"/>
                     </div>
                 </div>
             </xpath>
