@@ -105,20 +105,6 @@ class AccountMove(models.Model):
                 and bool(move.l10n_it_edi_transaction)
             )
 
-    # ── Lock dopo invio definitivo (transaction + p7m) ───────────────
-    l10n_it_pec_locked_sent = fields.Boolean(
-        compute='_compute_l10n_it_pec_locked_sent',
-        help="True quando la fattura è stata inviata definitivamente con file p7m firmato",
-    )
-
-    @api.depends('l10n_it_edi_transaction', 'l10n_it_pec_signed_attachment_id')
-    def _compute_l10n_it_pec_locked_sent(self):
-        for move in self:
-            move.l10n_it_pec_locked_sent = (
-                bool(move.l10n_it_edi_transaction)
-                and bool(move.l10n_it_pec_signed_attachment_id)
-            )
-
     def action_l10n_it_pec_reset_edi(self):
         """Resetta lo stato EDI per consentire il ritorno a bozza.
         Disponibile solo in modalità test PEC."""
@@ -563,6 +549,27 @@ class AccountMove(models.Model):
         self.l10n_it_pec_sent_date = fields.Datetime.now()
         self.l10n_it_pec_message_id = msg.get('Message-ID', '')
         self.l10n_it_pec_last_error = False
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Azione manuale: Sincronizza PEC SDI (bottone nelle viste lista)
+    # ══════════════════════════════════════════════════════════════════
+
+    def action_l10n_it_pec_sync_inbox(self):
+        """Esegue manualmente il polling della casella PEC.
+        Scarica notifiche SDI per fatture attive e fatture passive in arrivo."""
+        self.env['l10n_it_pec.mail.handler']._cron_poll_pec_inbox()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Sincronizzazione PEC SDI completata"),
+                'message': _("Controllo casella PEC eseguito. "
+                             "Eventuali nuove notifiche SDI e fatture passive sono state elaborate."),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
 
     # ══════════════════════════════════════════════════════════════════
     #  Azione manuale: Invia via PEC (bottone nella vista fattura)
