@@ -551,27 +551,6 @@ class AccountMove(models.Model):
         self.l10n_it_pec_last_error = False
 
     # ══════════════════════════════════════════════════════════════════
-    #  Azione manuale: Sincronizza PEC SDI (bottone nelle viste lista)
-    # ══════════════════════════════════════════════════════════════════
-
-    def action_l10n_it_pec_sync_inbox(self):
-        """Esegue manualmente il polling della casella PEC.
-        Scarica notifiche SDI per fatture attive e fatture passive in arrivo."""
-        self.env['l10n_it_pec.mail.handler']._cron_poll_pec_inbox()
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _("Sincronizzazione PEC SDI completata"),
-                'message': _("Controllo casella PEC eseguito. "
-                             "Eventuali nuove notifiche SDI e fatture passive sono state elaborate."),
-                'type': 'success',
-                'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
-            },
-        }
-
-    # ══════════════════════════════════════════════════════════════════
     #  Azione manuale: Invia via PEC (bottone nella vista fattura)
     # ══════════════════════════════════════════════════════════════════
 
@@ -678,6 +657,21 @@ class AccountMove(models.Model):
 
         # Salva notifica come allegato
         att_name = f"SDI_{notification_type}_{self.name.replace('/', '_')}.xml"
+
+        # Deduplica: se esiste già un allegato con questo nome sulla fattura,
+        # la notifica è già stata processata. Skip.
+        existing_notif = self.env['ir.attachment'].search([
+            ('name', '=', att_name),
+            ('res_model', '=', 'account.move'),
+            ('res_id', '=', self.id),
+        ], limit=1)
+        if existing_notif:
+            _logger.info(
+                "Notifica SDI %s per fattura %s già processata, skip.",
+                notification_type, self.name,
+            )
+            return
+
         self.env['ir.attachment'].create({
             'name': att_name,
             'raw': xml_content if isinstance(xml_content, bytes) else xml_content.encode('utf-8'),

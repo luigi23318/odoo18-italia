@@ -58,6 +58,30 @@ SDI_IDENTIFIER_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Pattern per estrarre il P.IVA del CessionarioCommittente (destinatario)
+# dalla fattura passiva. Cerca il tag IdCodice all'interno del blocco
+# CessionarioCommittente/DatiAnagrafici/IdFiscaleIVA.
+SDI_DEST_VAT_PATTERN = re.compile(
+    r'<CessionarioCommittente>.*?'
+    r'<IdFiscaleIVA>.*?<IdCodice>\s*([^<\s]+)\s*</IdCodice>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Pattern alternativo: CodiceFiscale del CessionarioCommittente
+# (per persone fisiche o se manca P.IVA).
+SDI_DEST_CF_PATTERN = re.compile(
+    r'<CessionarioCommittente>.*?'
+    r'<CodiceFiscale>\s*([^<\s]+)\s*</CodiceFiscale>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Pattern per estrarre il P.IVA del trasmittente dal filename di una notifica SDI.
+# Esempio: IT01879020517_00001_RC_001.xml → estrae "01879020517"
+SDI_NOTIF_VAT_FROM_FILENAME = re.compile(
+    r'^[A-Z]{2}([A-Z0-9]+)_',
+    re.IGNORECASE,
+)
+
 
 class PecMailHandler(models.AbstractModel):
     _name = 'l10n_it_pec.mail.handler'
@@ -144,7 +168,17 @@ class PecMailHandler(models.AbstractModel):
 
             for msg_id in message_ids:
                 try:
-                    self._process_pec_message(imap, msg_id, company)
+                    processed = self._process_pec_message(imap, msg_id, company)
+                    if not processed:
+                        # Il messaggio non era destinato a questa company:
+                        # rimuovi flag SEEN per lasciarlo disponibile alle altre.
+                        try:
+                            imap.store(msg_id, '-FLAGS', '\\Seen')
+                        except Exception as e:
+                            _logger.warning(
+                                "Impossibile resettare flag UNSEEN per msg %s: %s",
+                                msg_id, str(e),
+                            )
                 except Exception as e:
                     _logger.exception(
                         "Errore processamento messaggio PEC %s: %s",
@@ -159,10 +193,17 @@ class PecMailHandler(models.AbstractModel):
                 pass
 
     def _process_pec_message(self, imap, msg_id, company):
-        """Processa un singolo messaggio PEC dallo SDI."""
+        """Processa un singolo messaggio PEC dallo SDI.
+
+        Ritorna:
+        - True se il messaggio è stato processato per questa company
+          (almeno un allegato era destinato a questa company)
+        - False se nessun allegato era destinato a questa company
+          (la mail va lasciata UNSEEN per altre company)
+        """
         status, msg_data = imap.fetch(msg_id, '(RFC822)')
         if status != 'OK':
-            return
+            return False
 
         raw_email = msg_data[0][1]
         msg = email.message_from_bytes(raw_email, policy=policy.default)
@@ -194,7 +235,10 @@ class PecMailHandler(models.AbstractModel):
 
         if not xml_attachments:
             _logger.info("Nessun allegato XML nel messaggio PEC")
-            return
+            return False
+
+        # Flag: almeno un allegato è stato processato per questa company
+        any_processed = False
 
         for attachment in xml_attachments:
             filename = attachment['filename']
@@ -213,12 +257,27 @@ class PecMailHandler(models.AbstractModel):
 
             if notif_match:
                 # È una notifica SDI (RC, NS, MC, AT, NE, DT)
+                # Verifica se la notifica è per questa company
+                if not self._notification_is_for_company(filename, company):
+                    _logger.info(
+                        "Notifica %s non destinata a company %s, skip.",
+                        filename, company.name,
+                    )
+                    continue
                 notif_type = notif_match.group(1).upper()
                 self._handle_sdi_notification(
                     notif_type, content, filename, company,
                 )
+                any_processed = True
             elif SDI_PASSIVE_INVOICE_PATTERN.match(filename):
                 # È una fattura passiva ricevuta.
+                # Verifica se la fattura è destinata a questa company
+                if not self._passive_invoice_is_for_company(content, company):
+                    _logger.info(
+                        "Fattura passiva %s non destinata a company %s, skip.",
+                        filename, company.name,
+                    )
+                    continue
                 # Cerca tra gli altri allegati il file metadati
                 # corrispondente per estrarre l'IdentificativoSdI.
                 sdi_identifier = self._find_sdi_identifier_for_invoice(
@@ -230,10 +289,71 @@ class PecMailHandler(models.AbstractModel):
                     raw_email=raw_email, subject=subject,
                     sdi_identifier=sdi_identifier,
                 )
+                any_processed = True
             else:
                 _logger.info(
                     "Allegato XML non riconosciuto: %s", filename
                 )
+
+        return any_processed
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Helper: filtraggio destinatario
+    # ══════════════════════════════════════════════════════════════════
+
+    def _normalize_vat(self, value):
+        """Normalizza un identificativo fiscale per il confronto:
+        rimuove prefisso paese (IT) e converte in maiuscolo."""
+        if not value:
+            return ''
+        v = str(value).strip().upper()
+        if v.startswith('IT') and len(v) > 2:
+            v = v[2:]
+        return v
+
+    def _notification_is_for_company(self, filename, company):
+        """Verifica se la notifica SDI nel filename è destinata a questa company.
+        Il P.IVA del trasmittente è nel filename (primo blocco dopo IT)."""
+        match = SDI_NOTIF_VAT_FROM_FILENAME.match(filename)
+        if not match:
+            # Se non riusciamo a estrarre il P.IVA, processiamo per backward compat
+            return True
+        notif_vat = self._normalize_vat(match.group(1))
+        company_vat = self._normalize_vat(company.vat)
+        company_cf = self._normalize_vat(company.l10n_it_codice_fiscale)
+        return notif_vat in (company_vat, company_cf)
+
+    def _passive_invoice_is_for_company(self, xml_content, company):
+        """Verifica se la fattura passiva è destinata a questa company.
+        Estrae il P.IVA o CodiceFiscale del CessionarioCommittente dall'XML."""
+        try:
+            content = xml_content if isinstance(xml_content, str) else xml_content.decode('utf-8', errors='replace')
+        except Exception:
+            return True  # Se non riusciamo a leggere, processiamo per backward compat
+
+        company_vat = self._normalize_vat(company.vat)
+        company_cf = self._normalize_vat(company.l10n_it_codice_fiscale)
+
+        # Cerca P.IVA destinatario
+        match = SDI_DEST_VAT_PATTERN.search(content)
+        if match:
+            dest_vat = self._normalize_vat(match.group(1))
+            if dest_vat in (company_vat, company_cf):
+                return True
+
+        # Cerca Codice Fiscale destinatario
+        match = SDI_DEST_CF_PATTERN.search(content)
+        if match:
+            dest_cf = self._normalize_vat(match.group(1))
+            if dest_cf in (company_vat, company_cf):
+                return True
+
+        # Se né P.IVA né CF sono presenti nell'XML, non possiamo decidere:
+        # processiamo per backward compat (raro caso edge).
+        if not SDI_DEST_VAT_PATTERN.search(content) and not SDI_DEST_CF_PATTERN.search(content):
+            return True
+
+        return False
 
     def _find_sdi_identifier_for_invoice(self, invoice_filename, all_attachments):
         """Cerca il file metadati SDI accluso al messaggio PEC e ne
@@ -425,9 +545,25 @@ class PecMailHandler(models.AbstractModel):
         )
 
         # ── Deduplica ─────────────────────────────────────────────────
-        # Se un attachment con lo stesso nome è già collegato a una
-        # account.move della stessa company, la fattura è già stata
-        # importata in un giro precedente del cron: non rifare nulla.
+        # Una fattura passiva PEC è già stata importata se:
+        # 1. Esiste un ir.attachment con lo stesso filename collegato a
+        #    una account.move della stessa company, OPPURE
+        # 2. Esiste una account.move con lo stesso IdentificativoSdI
+        #    nella stessa company (chiave univoca di trasmissione SDI).
+        if sdi_identifier:
+            existing_by_sdi = self.env['account.move'].search([
+                ('l10n_it_pec_sdi_identifier', '=', sdi_identifier),
+                ('company_id', '=', company.id),
+            ], limit=1)
+            if existing_by_sdi:
+                _logger.info(
+                    "Fattura passiva %s già importata (move %s, SDI: %s), skip.",
+                    filename, existing_by_sdi.name or existing_by_sdi.id,
+                    sdi_identifier,
+                )
+                return
+
+        # Deduplica per filename (fallback se SDI identifier mancante)
         existing = self.env['ir.attachment'].search([
             ('name', '=', filename),
             ('res_model', '=', 'account.move'),
