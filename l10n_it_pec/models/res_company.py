@@ -106,6 +106,17 @@ class ResCompany(models.Model):
         ),
     )
 
+    # ── Flag amministrativo per sbloccare cambio modalità ─────────────
+    l10n_it_pec_unlock_production = fields.Boolean(
+        string='Sblocca cambio modalità da Produzione',
+        default=False,
+        help=(
+            "ATTENZIONE: Quando abilitato, permette di cambiare la modalità PEC SDI "
+            "da Produzione a Test o Demo. Riservato all'amministratore. "
+            "Si disattiva automaticamente dopo il cambio modalità."
+        ),
+    )
+
     # ── Bypass check proxy user per company che usano PEC ──────────────
     def _l10n_it_edi_export_check(self):
         errors = super()._l10n_it_edi_export_check()
@@ -159,6 +170,29 @@ class ResCompany(models.Model):
                     "e le fatture resteranno in stato 'processing'.",
                     self.name,
                 )
+
+    def write(self, vals):
+        """Impedisce di tornare a test/demo dopo aver scelto produzione,
+        a meno che l'amministratore non abbia attivato il flag di sblocco."""
+        if 'l10n_it_edi_pec_mode' in vals and vals['l10n_it_edi_pec_mode'] != 'production':
+            for company in self:
+                if (company.l10n_it_edi_pec_mode == 'production'
+                        and not company.l10n_it_pec_unlock_production
+                        and not vals.get('l10n_it_pec_unlock_production')):
+                    raise UserError(_(
+                        "L'azienda '%(company)s' è in modalità Produzione PEC SDI. "
+                        "Per cambiare modalità (operazione riservata all'amministratore), "
+                        "abilitare prima il flag 'Sblocca cambio modalità da Produzione' "
+                        "nelle impostazioni PEC SDI dell'azienda.",
+                        company=company.name,
+                    ))
+        # Dopo aver cambiato modalità, disattiva automaticamente il flag di sblocco
+        result = super().write(vals)
+        if 'l10n_it_edi_pec_mode' in vals:
+            for company in self:
+                if company.l10n_it_pec_unlock_production:
+                    super(ResCompany, company).write({'l10n_it_pec_unlock_production': False})
+        return result
 
     def action_test_pec_connection(self):
         """Testa la connessione SMTP PEC."""

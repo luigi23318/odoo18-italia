@@ -15,7 +15,7 @@
                         string="📨 Invia via PEC"
                         type="object"
                         class="btn-primary"
-                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund')"
+                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund') or l10n_it_edi_transaction"
                         groups="l10n_it_pec.group_pec_manager"/>
                 <button name="action_l10n_it_pec_preview_xml"
                         string="👁 Anteprima XML"

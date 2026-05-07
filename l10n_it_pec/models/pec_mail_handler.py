@@ -549,7 +549,10 @@ class PecMailHandler(models.AbstractModel):
         # 1. Esiste un ir.attachment con lo stesso filename collegato a
         #    una account.move della stessa company, OPPURE
         # 2. Esiste una account.move con lo stesso IdentificativoSdI
-        #    nella stessa company (chiave univoca di trasmissione SDI).
+        #    nella stessa company (chiave univoca di trasmissione SDI),
+        #    OPPURE
+        # 3. Esiste un attachment .eml o .pec con lo stesso prefisso
+        #    filename (es: IT01879020517A2026_cwbJU_pec.eml) sulla company.
         if sdi_identifier:
             existing_by_sdi = self.env['account.move'].search([
                 ('l10n_it_pec_sdi_identifier', '=', sdi_identifier),
@@ -576,6 +579,29 @@ class PecMailHandler(models.AbstractModel):
                     filename, existing_move.name or existing_move.id,
                 )
                 return
+
+        # Deduplica tramite prefisso filename PEC.
+        # Es: filename "IT01879020517A2026_cwbJU.xml.p7m"
+        # → cerca attachment "IT01879020517A2026_cwbJU%" su account.move della company
+        # (cattura sia .xml/.xml.p7m che .eml/.pec.eml di import precedenti)
+        prefix = filename
+        for ext in ('.xml.p7m', '.xml'):
+            if prefix.lower().endswith(ext):
+                prefix = prefix[:-len(ext)]
+                break
+        if prefix and prefix != filename:
+            existing_by_prefix = self.env['ir.attachment'].search([
+                ('name', '=like', f'{prefix}%'),
+                ('res_model', '=', 'account.move'),
+            ])
+            for att in existing_by_prefix:
+                existing_move = self.env['account.move'].browse(att.res_id)
+                if existing_move.exists() and existing_move.company_id == company:
+                    _logger.info(
+                        "Fattura passiva %s già importata (move %s, prefix match: %s), skip.",
+                        filename, existing_move.name or existing_move.id, att.name,
+                    )
+                    return
 
         # ── Import tramite il parser standard l10n_it_edi ─────────────
         # Replichiamo il pattern ufficiale usato dal codice standard

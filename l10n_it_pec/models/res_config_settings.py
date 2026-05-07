@@ -64,3 +64,7 @@ class ResConfigSettings(models.TransientModel):
         related='company_id.l10n_it_pec_filename_id_type',
         readonly=False,
     )
+    l10n_it_pec_unlock_production = fields.Boolean(
+        related='company_id.l10n_it_pec_unlock_production',
+        readonly=False,
+    )

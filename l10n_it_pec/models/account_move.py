@@ -91,24 +91,41 @@ class AccountMove(models.Model):
              "fornitore.",
     )
 
-    # ── Reset stato EDI (solo modalità test) ─────────────────────────
+    # ── Reset stato EDI (solo modalità test, mai per fatture inviate in produzione) ─
     l10n_it_pec_show_reset_edi = fields.Boolean(
         compute='_compute_l10n_it_pec_show_reset_edi',
     )
+    l10n_it_pec_sent_in_production = fields.Boolean(
+        string='Inviata in Produzione',
+        copy=False,
+        readonly=True,
+        help=(
+            "True se la fattura è stata inviata via PEC in modalità produzione. "
+            "Una volta True non torna mai indietro: protegge da reset accidentali "
+            "che porterebbero a disallineamento con SDI/Agenzia delle Entrate."
+        ),
+    )
 
-    @api.depends('l10n_it_edi_transaction', 'state')
+    @api.depends('l10n_it_edi_transaction', 'state', 'l10n_it_pec_sent_in_production')
     def _compute_l10n_it_pec_show_reset_edi(self):
         for move in self:
             move.l10n_it_pec_show_reset_edi = (
                 move.company_id.l10n_it_edi_pec_mode == 'test'
                 and move.state == 'posted'
                 and bool(move.l10n_it_edi_transaction)
+                and not move.l10n_it_pec_sent_in_production
             )
 
     def action_l10n_it_pec_reset_edi(self):
         """Resetta lo stato EDI per consentire il ritorno a bozza.
-        Disponibile solo in modalità test PEC."""
+        Disponibile solo in modalità test PEC e solo per fatture mai inviate in produzione."""
         self.ensure_one()
+        if self.l10n_it_pec_sent_in_production:
+            raise UserError(_(
+                "Questa fattura è stata inviata in modalità Produzione allo SDI. "
+                "Non è possibile annullare l'invio EDI per evitare disallineamento "
+                "tra Odoo e l'Agenzia delle Entrate."
+            ))
         if self.company_id.l10n_it_edi_pec_mode != 'test':
             raise UserError(_(
                 "L'annullamento dello stato EDI è consentito solo in modalità test."
@@ -549,6 +566,9 @@ class AccountMove(models.Model):
         self.l10n_it_pec_sent_date = fields.Datetime.now()
         self.l10n_it_pec_message_id = msg.get('Message-ID', '')
         self.l10n_it_pec_last_error = False
+        # Marca la fattura come inviata in produzione (one-way, non torna indietro)
+        if mode == 'production':
+            self.l10n_it_pec_sent_in_production = True
 
     # ══════════════════════════════════════════════════════════════════
     #  Azione manuale: Invia via PEC (bottone nella vista fattura)
@@ -592,31 +612,42 @@ class AccountMove(models.Model):
             self.l10n_it_pec_xml_attachment_id = self.l10n_it_edi_attachment_id
 
     def action_l10n_it_pec_preview_xml(self):
-        """Genera e mostra l'XML senza inviare."""
+        """Mostra l'XML della fattura nel browser senza scaricarlo."""
         self.ensure_one()
         if self.state != 'posted':
             raise UserError(_("La fattura deve essere confermata per generare l'XML."))
 
-        xml_content, filename = self._l10n_it_pec_generate_xml()
+        # Cerca attachment XML esistente
+        attachment = self.l10n_it_edi_attachment_id
+        if not attachment:
+            attachment = self.l10n_it_pec_xml_attachment_id
+        if not attachment:
+            attachment = self.env['ir.attachment'].search([
+                ('res_model', '=', 'account.move'),
+                ('res_id', '=', self.id),
+                ('name', '=like', 'IT%.xml'),
+            ], limit=1, order='create_date desc')
 
-        self.message_post(
-            body=_(
-                "👁 Anteprima XML generata: <code>%s</code> (%d bytes)"
-            ) % (filename, len(xml_content)),
-            message_type='notification',
-            subtype_xmlid='mail.mt_note',
-            attachment_ids=[self.l10n_it_pec_xml_attachment_id.id],
-        )
+        if not attachment:
+            # Genera l'XML al volo come attachment temporaneo (non legato alla fattura)
+            # per non creare allegati visibili e non consumare il progressivo
+            if errors := self._l10n_it_edi_export_data_check():
+                messages = []
+                for error_key, error_data in errors.items():
+                    messages.append(error_data['message'])
+                raise UserError('\n'.join(messages))
+            xml_content = self._l10n_it_edi_render_xml()
+            attachment = self.env['ir.attachment'].create({
+                'name': 'anteprima_fattura.xml',
+                'raw': xml_content,
+                'mimetype': 'application/xml',
+            })
 
+        # Apre l'XML nel browser (senza download)
         return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _("XML Generato"),
-                'message': _("File %s generato e allegato alla fattura.") % filename,
-                'type': 'success',
-                'sticky': False,
-            },
+            'type': 'ir.actions.act_url',
+            'url': f'/web/content/{attachment.id}',
+            'target': 'new',
         }
 
     # ══════════════════════════════════════════════════════════════════
