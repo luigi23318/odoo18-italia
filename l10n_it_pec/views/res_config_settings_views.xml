@@ -1,5 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <odoo>
+
     <!-- ═══════════════════════════════════════════════════════════════
          Vista Impostazioni: Sezione PEC SDI
          ═══════════════════════════════════════════════════════════════ -->
@@ -102,10 +103,20 @@
                         <field name="l10n_it_pec_unlock_production"/>
                     </setting>
 
+                    <!-- ─────────────────────────────────────────────
+                         Identificativo nel nome file XML FatturaPA
+                         (aggiunto da OdooManager.cloud)
+                         ───────────────────────────────────────────── -->
+                    <setting string="Identificativo nel nome file XML"
+                             help="Scegli quale identificativo usare nel nome del file XML FatturaPA inviato allo SDI. Per soggetti con Partita IVA (forfettari, professionisti, ditte individuali, persone giuridiche) è consigliato selezionare 'Partita IVA'. Esempio: IT04718190160_00001.xml (P.IVA) vs ITTSCMGV73H62L400Y_00001.xml (Codice Fiscale). Entrambi sono accettati dallo SDI.">
+                        <field name="l10n_it_pec_filename_id_type" widget="radio"/>
+                    </setting>
+
                 </block>
             </xpath>
         </field>
     </record>
+
     <!-- ═══════════════════════════════════════════════════════════════
          Nascondi configurazione SDI proxy standard quando PEC è installato
          (rimosso automaticamente alla disinstallazione del modulo)
@@ -123,4 +134,5 @@
             </xpath>
         </field>
     </record>
+
 </odoo>
