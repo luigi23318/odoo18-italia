@@ -8,6 +8,24 @@ from odoo import _, api, models
 class AccountMoveSend(models.AbstractModel):
     _inherit = 'account.move.send'
 
+    def _get_invoice_extra_attachments(self, invoice):
+        """Override: se la fattura ha un file .p7m firmato, sostituisce l'XML
+        standard con il firmato negli allegati del wizard "Stampa e invia".
+
+        Razionale:
+        - Il .p7m contiene al suo interno l'XML originale + firma CAdES.
+        - È il documento "ufficiale" trasmesso allo SDI.
+        - Per il destinatario è più informativo (può verificare la firma).
+        - Comportamento uniforme: PDF + (.p7m se firmato | .xml se non firmato).
+        """
+        result = super()._get_invoice_extra_attachments(invoice)
+        if invoice.l10n_it_pec_signed_attachment_id:
+            # Rimuovi l'XML standard (se presente) e sostituiscilo con il .p7m
+            if invoice.l10n_it_edi_attachment_id:
+                result = result - invoice.l10n_it_edi_attachment_id
+            result = result + invoice.l10n_it_pec_signed_attachment_id
+        return result
+
     def _get_alerts(self, moves, moves_data):
         alerts = super()._get_alerts(moves, moves_data)
 

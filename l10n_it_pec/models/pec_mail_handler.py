@@ -484,18 +484,44 @@ class PecMailHandler(models.AbstractModel):
     def _find_invoice_by_reference(self, reference, company):
         """
         Cerca una fattura nel database per riferimento.
-        Il riferimento può essere il nome file XML o il nome fattura.
+        Il riferimento può essere il nome file XML (es. "IT01234567890_00001")
+        o il nome fattura (es. "FATT/2026/00001").
+
+        Logica di ricerca:
+        1. Cerca attachment standard (l'XML PEC inviato dal modulo).
+        2. Cerca tra i binary field di Odoo 18 (res_field='l10n_it_edi_attachment_file');
+           questi sono nascosti dal search standard ma usati da Odoo 18 per
+           memorizzare gli XML FatturaPA.
+        3. Cerca per nome fattura (con conversione underscore -> slash).
         """
-        # Cerca per nome file nell'allegato XML PEC
+        # Costruisci varianti del nome per coprire .xml e .xml.p7m
+        ref_base = reference.replace('.xml.p7m', '').replace('.xml', '')
+        ref_xml = ref_base + '.xml'
+        ref_p7m = ref_base + '.xml.p7m'
+
+        # 1. Cerca attachment standard (res_field IS NULL implicito)
         attachment = self.env['ir.attachment'].search([
-            ('name', 'like', reference),
+            ('name', 'in', [ref_base, ref_xml, ref_p7m]),
             ('res_model', '=', 'account.move'),
-        ], limit=1)
+        ], limit=1, order='create_date desc')
 
         if attachment:
             return self.env['account.move'].browse(attachment.res_id)
 
-        # Cerca per nome fattura (normalizza separatori)
+        # 2. Cerca tra i binary field (Odoo 18 li nasconde dal search standard)
+        attachment = self.env['ir.attachment'].sudo().search([
+            ('name', 'in', [ref_base, ref_xml, ref_p7m]),
+            ('res_model', '=', 'account.move'),
+            ('res_field', '=', 'l10n_it_edi_attachment_file'),
+        ], limit=1, order='create_date desc')
+
+        if attachment:
+            invoice = self.env['account.move'].browse(attachment.res_id)
+            # Verifica che la fattura sia della company corretta
+            if invoice.exists() and invoice.company_id == company:
+                return invoice
+
+        # 3. Fallback: cerca per nome fattura (normalizza separatori)
         normalized_ref = reference.replace('_', '/')
         move = self.env['account.move'].search([
             ('name', '=', normalized_ref),
@@ -505,8 +531,6 @@ class PecMailHandler(models.AbstractModel):
         if move:
             return move
 
-        # Cerca per pec_message_id correlato
-        # (alcune notifiche SDI hanno l'In-Reply-To del messaggio originale)
         return None
 
     # ══════════════════════════════════════════════════════════════════
@@ -566,10 +590,16 @@ class PecMailHandler(models.AbstractModel):
                 )
                 return
 
-        # Deduplica per filename (fallback se SDI identifier mancante)
-        existing = self.env['ir.attachment'].search([
+        # Deduplica per filename (fallback se SDI identifier mancante).
+        # Cerca sia attachment standard che binary field di Odoo 18
+        # (res_field='l10n_it_edi_attachment_file' è dove Odoo 18 salva
+        # l'XML della fattura passiva importata).
+        existing = self.env['ir.attachment'].sudo().search([
             ('name', '=', filename),
             ('res_model', '=', 'account.move'),
+            '|',
+            ('res_field', '=', False),
+            ('res_field', '=', 'l10n_it_edi_attachment_file'),
         ], limit=1)
         if existing:
             existing_move = self.env['account.move'].browse(existing.res_id)
@@ -590,9 +620,13 @@ class PecMailHandler(models.AbstractModel):
                 prefix = prefix[:-len(ext)]
                 break
         if prefix and prefix != filename:
-            existing_by_prefix = self.env['ir.attachment'].search([
+            # Cerca sia attachment standard che binary field
+            existing_by_prefix = self.env['ir.attachment'].sudo().search([
                 ('name', '=like', f'{prefix}%'),
                 ('res_model', '=', 'account.move'),
+                '|',
+                ('res_field', '=', False),
+                ('res_field', '=', 'l10n_it_edi_attachment_file'),
             ])
             for att in existing_by_prefix:
                 existing_move = self.env['account.move'].browse(att.res_id)

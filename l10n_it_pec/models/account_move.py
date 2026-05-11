@@ -180,25 +180,66 @@ class AccountMove(models.Model):
                 move.l10n_it_pec_signature_state = 'awaiting'
 
     def _l10n_it_pec_is_pa_invoice(self):
-        """Determina se la fattura è destinata a una Pubblica Amministrazione.
-        Codici IPA della PA sono di 6 caratteri alfanumerici maiuscoli.
+        """Determina se mostrare i pulsanti firma digitale.
+
+        Per OdooManager.cloud: i pulsanti firma sono sempre visibili
+        sulle fatture cliente. L'utente decide se firmare o meno.
+        Se firma, l'XML firmato sostituisce quello standard nell'invio.
+        Se non firma, viene inviato l'XML standard (valido per B2B/B2C).
         """
         self.ensure_one()
-        pa_index = self.commercial_partner_id.l10n_it_pa_index or ''
-        return bool(pa_index) and len(pa_index) == 6 and pa_index.isalnum() and pa_index.isupper()
+        return self.move_type in ('out_invoice', 'out_refund')
 
     def action_l10n_it_pec_download_xml(self):
-        """Scarica l'XML della fattura per la firma digitale in locale."""
+        """Scarica l'XML della fattura per la firma digitale in locale.
+
+        Logica di ricerca dell'XML:
+        1. Cerca tra gli ir.attachment standard (res_field IS NULL).
+        2. Se non trovato, cerca tra i binary field di Odoo 18
+           (res_field = 'l10n_it_edi_attachment_file'); questi sono nascosti
+           di default dal search standard ma esistono nel DB.
+        3. Se ancora non trovato, genera l'XML al volo.
+        """
         self.ensure_one()
+
+        if self.state != 'posted':
+            raise UserError(_(
+                "Conferma prima la fattura per poter generare l'XML FatturaPA."
+            ))
+
+        # 1. Cerca attachment standard
         attachment = self.env['ir.attachment'].search([
             ('res_model', '=', 'account.move'),
             ('res_id', '=', self.id),
             ('name', '=like', 'IT%.xml'),
         ], limit=1, order='create_date desc')
 
+        # 2. Cerca tra i binary fields (nascosti di default dal search)
         if not attachment:
-            raise UserError(_("Nessun file XML trovato per questa fattura. "
-                              "Generare prima il file XML tramite 'Invia e Stampa'."))
+            attachment = self.env['ir.attachment'].sudo().search([
+                ('res_model', '=', 'account.move'),
+                ('res_id', '=', self.id),
+                ('res_field', '=', 'l10n_it_edi_attachment_file'),
+            ], limit=1, order='create_date desc')
+
+        # 3. Genera al volo se mancante
+        if not attachment:
+            try:
+                attachment_values = self._l10n_it_edi_get_attachment_values()
+                attachment = self.env['ir.attachment'].create(attachment_values)
+                self.sudo().message_post(body=_(
+                    "XML FatturaPA generato al volo per la firma digitale: %s",
+                    attachment.name
+                ))
+            except Exception as e:
+                _logger.exception(
+                    "Errore generazione XML per firma digitale fattura %s: %s",
+                    self.name, str(e)
+                )
+                raise UserError(_(
+                    "Impossibile generare l'XML FatturaPA: %s",
+                    str(e)
+                ))
 
         return {
             'type': 'ir.actions.act_url',
@@ -294,6 +335,27 @@ class AccountMove(models.Model):
             return self._l10n_it_pec_check_notifications()
         return super().action_check_l10n_it_edi()
 
+    def _get_invoice_legal_documents(self, filetype, allow_fallback=False):
+        """Override: se la fattura ha un file XML firmato digitalmente (.p7m),
+        usa quello come documento legale FatturaPA invece dell'XML standard.
+
+        Razionale:
+        - Il .p7m contiene al suo interno l'XML originale + firma digitale CAdES.
+        - È il documento "ufficiale" trasmesso allo SDI.
+        - Per il destinatario è più informativo (può verificare la firma).
+        - Comportamento uniforme: PDF + (.p7m se firmato | .xml se non firmato).
+        """
+        if filetype == 'fatturapa' and self.l10n_it_pec_signed_attachment_id:
+            signed = self.l10n_it_pec_signed_attachment_id
+            return {
+                'filename': signed.name,
+                'filetype': 'xml',
+                'content': signed.raw,
+            }
+        return super()._get_invoice_legal_documents(
+            filetype, allow_fallback=allow_fallback
+        )
+
     def _l10n_it_edi_update_send_state(self):
         """Override: esclude le fatture inviate via PEC dal polling proxy standard.
         Il cron standard chiama questo metodo con transaction ID del proxy;
@@ -369,21 +431,10 @@ class AccountMove(models.Model):
             filename = attachment.get('name', '')
             xml_content = attachment.get('raw', b'')
 
-            # Firma digitale PA: stessa logica di _l10n_it_edi_upload
-            if move._l10n_it_pec_is_pa_invoice() and move.l10n_it_pec_signed_attachment_id:
-                signed_att = move.l10n_it_pec_signed_attachment_id
-                send_filename = signed_att.name
-            elif move._l10n_it_pec_is_pa_invoice() and not move.l10n_it_pec_signed_attachment_id:
-                error_message = _(
-                    "Le fatture verso la PA richiedono la firma digitale. "
-                    "Scaricare l'XML, firmarlo e ricaricare il file firmato."
-                )
-                move.l10n_it_edi_header = error_message
-                move.sudo().message_post(body=error_message)
-                results[filename] = {
-                    'error_message': error_message,
-                }
-                continue
+            # Firma digitale: usa il firmato se presente, altrimenti l'XML standard
+            # Comportamento: firma opzionale per tutte le fatture cliente
+            if move.l10n_it_pec_signed_attachment_id:
+                send_filename = move.l10n_it_pec_signed_attachment_id.name
             else:
                 send_filename = filename
 
@@ -429,24 +480,16 @@ class AccountMove(models.Model):
         for file_data in (files or []):
             filename = file_data['filename']
 
-            # Firma digitale PA: sostituisci contenuto con file firmato
+            # Firma digitale: sostituisci con il firmato se presente
             # Il filename originale è preservato come chiave nel dict dei risultati
             # perché il chiamante _l10n_it_edi_send() lo usa per il lookup.
-            if self._l10n_it_pec_is_pa_invoice() and self.l10n_it_pec_signed_attachment_id:
+            # Firma opzionale: se manca, invia l'XML standard (valido per B2B/B2C).
+            if self.l10n_it_pec_signed_attachment_id:
                 signed_att = self.l10n_it_pec_signed_attachment_id
                 file_data = dict(file_data,
                     filename=signed_att.name,
                     xml=signed_att.datas,
                 )
-            elif self._l10n_it_pec_is_pa_invoice() and not self.l10n_it_pec_signed_attachment_id:
-                results[filename] = {
-                    'error': _("Firma digitale richiesta"),
-                    'error_description': _(
-                        "Le fatture verso la PA richiedono la firma digitale. "
-                        "Scaricare l'XML, firmarlo e ricaricare il file firmato."
-                    ),
-                }
-                continue
 
             try:
                 self._l10n_it_pec_send_to_sdi(file_data)

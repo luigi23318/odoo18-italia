@@ -34,47 +34,42 @@
                 <field name="l10n_it_pec_show_reset_edi" invisible="1"/>
             </xpath>
 
-            <!-- Blocco firma digitale PA -->
+            <!-- Pulsanti firma digitale (opzionale per B2B/B2C, obbligatoria per PA)
+                 Comportamento:
+                 - Visibili solo su fatture cliente confermate
+                 - Si nascondono dopo l'invio via PEC (sent_date valorizzato)
+                 - Si nascondono se lo stato EDI è oltre 'being_sent' o 'requires_user_signature'
+                 - L'utente decide se firmare prima dell'invio
+                 - Se firma, l'XML firmato sostituisce quello standard nell'invio
+                 - Se non firma, viene inviato l'XML standard (valido per B2B/B2C) -->
             <xpath expr="//header" position="after">
-                <div invisible="not l10n_it_pec_signature_required or move_type not in ('out_invoice', 'out_refund')">
-                    <!-- Stato: in attesa di firma -->
-                    <div class="alert alert-warning mb-0"
-                         role="alert"
-                         invisible="l10n_it_pec_signature_state != 'awaiting'">
-                        <strong>Firma digitale richiesta</strong> —
-                        Fattura PA: scaricare l'XML, firmarlo e ricaricare.
-                    </div>
-
-                    <!-- Stato: firmato -->
-                    <div class="alert alert-success mb-0"
-                         role="alert"
-                         invisible="l10n_it_pec_signature_state != 'signed'">
-                        <strong>Firmato digitalmente</strong> —
-                        <field name="l10n_it_pec_signed_attachment_id" readonly="1" nolabel="1" class="d-inline"/>
-                    </div>
-
-                    <!-- Bottoni firma -->
-                    <div class="mt-2">
-                        <button name="action_l10n_it_pec_download_xml"
-                                string="Scarica XML per firma"
-                                type="object"
-                                class="btn-link"
-                                icon="fa-download"
-                                invisible="l10n_it_pec_signature_state != 'awaiting'"/>
-                        <button name="action_l10n_it_pec_upload_signed"
-                                string="Carica XML firmato"
-                                type="object"
-                                class="btn-link"
-                                icon="fa-upload"
-                                invisible="l10n_it_pec_signature_state != 'awaiting'"/>
-                        <button name="action_l10n_it_pec_remove_signed"
-                                string="Rimuovi firma"
-                                type="object"
-                                class="btn-link text-danger"
-                                icon="fa-trash"
-                                confirm="Rimuovere il file firmato?"
-                                invisible="l10n_it_pec_signature_state != 'signed'"/>
-                    </div>
+                <div invisible="move_type not in ('out_invoice', 'out_refund') or state != 'posted' or l10n_it_pec_sent_date or l10n_it_edi_state in ('processing', 'rejected', 'forwarded', 'forward_failed', 'forward_attempt', 'accepted_by_pa_partner', 'rejected_by_pa_partner', 'accepted_by_pa_partner_after_expiry')"
+                     class="mt-2">
+                    <button name="action_l10n_it_pec_download_xml"
+                            string="Scarica XML per firma"
+                            type="object"
+                            class="btn-link"
+                            icon="fa-download"
+                            invisible="l10n_it_pec_signed_attachment_id"
+                            help="Scarica l'XML della fattura per firmarlo digitalmente in locale (.xml.p7m)"/>
+                    <button name="action_l10n_it_pec_upload_signed"
+                            string="Carica XML firmato"
+                            type="object"
+                            class="btn-link"
+                            icon="fa-upload"
+                            invisible="l10n_it_pec_signed_attachment_id"
+                            help="Carica il file XML firmato digitalmente (.xml.p7m). Sostituirà l'XML standard nell'invio allo SDI."/>
+                    <button name="action_l10n_it_pec_remove_signed"
+                            string="Rimuovi firma"
+                            type="object"
+                            class="btn-link text-danger"
+                            icon="fa-trash"
+                            confirm="Rimuovere il file firmato? La prossima trasmissione userà l'XML standard non firmato."
+                            invisible="not l10n_it_pec_signed_attachment_id"/>
+                    <field name="l10n_it_pec_signed_attachment_id"
+                           invisible="not l10n_it_pec_signed_attachment_id"
+                           readonly="1"
+                           class="ms-2"/>
                 </div>
             </xpath>
 
