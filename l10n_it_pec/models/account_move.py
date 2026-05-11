@@ -655,43 +655,21 @@ class AccountMove(models.Model):
             self.l10n_it_pec_xml_attachment_id = self.l10n_it_edi_attachment_id
 
     def action_l10n_it_pec_preview_xml(self):
-        """Mostra l'XML della fattura nel browser senza scaricarlo."""
+        """Mostra l'XML della fattura nel browser SENZA creare ir.attachment.
+        Il rendering è gestito da un controller HTTP custom che serve l'XML
+        direttamente come risposta, leggendo da campo esistente o generando
+        al volo in memoria.
+        """
         self.ensure_one()
         if self.state != 'posted':
             raise UserError(_("La fattura deve essere confermata per generare l'XML."))
 
-        # Cerca attachment XML esistente
-        attachment = self.l10n_it_edi_attachment_id
-        if not attachment:
-            attachment = self.l10n_it_pec_xml_attachment_id
-        if not attachment:
-            attachment = self.env['ir.attachment'].search([
-                ('res_model', '=', 'account.move'),
-                ('res_id', '=', self.id),
-                ('name', '=like', 'IT%.xml'),
-            ], limit=1, order='create_date desc')
-
-        if not attachment:
-            # Genera l'XML al volo come attachment temporaneo (non legato alla fattura)
-            # per non creare allegati visibili e non consumare il progressivo
-            if errors := self._l10n_it_edi_export_data_check():
-                messages = []
-                for error_key, error_data in errors.items():
-                    messages.append(error_data['message'])
-                raise UserError('\n'.join(messages))
-            xml_content = self._l10n_it_edi_render_xml()
-            attachment = self.env['ir.attachment'].create({
-                'name': 'anteprima_fattura.xml',
-                'raw': xml_content,
-                'mimetype': 'application/xml',
-            })
-
-        # Apre l'XML nel browser (senza download)
         return {
             'type': 'ir.actions.act_url',
-            'url': f'/web/content/{attachment.id}',
+            'url': f'/l10n_it_pec/preview_xml/{self.id}',
             'target': 'new',
         }
+
 
     # ══════════════════════════════════════════════════════════════════
     #  Processamento notifiche SDI ricevute via PEC
