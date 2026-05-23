@@ -100,12 +100,6 @@ class PdcodmSetupWizard(models.TransientModel):
         help="Se attivo, crea 6 giornali contabili standard "
              "(vendite, acquisti, cassa, banca, operazioni varie, apertura/chiusura).",
     )
-    enable_analytic = fields.Boolean(
-        string="Attiva contabilità analitica",
-        default=False,
-        help="Flag di promemoria: la contabilità analitica si configura "
-             "separatamente in Odoo. Questo flag non installa moduli aggiuntivi.",
-    )
 
     # Preview (computed live al cambio regime/include_storico)
     preview_account_count = fields.Integer(

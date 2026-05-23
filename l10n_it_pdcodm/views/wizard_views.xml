@@ -44,7 +44,6 @@
                                 <field name="strict_mode"/>
                                 <field name="include_storico"/>
                                 <field name="create_journals"/>
-                                <field name="enable_analytic"/>
                             </group>
                             <group string="Anteprima">
                                 <field name="preview_account_count" readonly="1"/>
