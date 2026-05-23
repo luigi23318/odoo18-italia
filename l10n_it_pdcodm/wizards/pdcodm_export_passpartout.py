@@ -244,7 +244,11 @@ class PdcodmExportPasspartoutWizard(models.TransientModel):
             if not self.include_zero_balance and not (debit or credit or saldo_iniziale or saldo_finale):
                 continue
 
-            cee = acc.l10n_it_pdcodm_cee_code or ''
+            cee_default = acc.l10n_it_pdcodm_cee_code or ''
+            # CEE specifici dare/avere se valorizzati (conti "misti"),
+            # altrimenti fallback al CEE principale (SPEC 9.2).
+            cee_dare = acc.l10n_it_pdcodm_cee_code_dare or cee_default
+            cee_avere = acc.l10n_it_pdcodm_cee_code_avere or cee_default
             mapping = mapping_by_code.get(acc.code)
             pp_code = mapping.passpartout_code if mapping else ''
             sezione = _ACCOUNT_TYPE_TO_SEZIONE.get(acc.account_type, '')
@@ -252,8 +256,8 @@ class PdcodmExportPasspartoutWizard(models.TransientModel):
             writer.writerow([
                 acc.code,
                 acc.name,
-                cee,  # CEE dare = CEE avere (semplificazione SPEC 9.2)
-                cee,
+                cee_dare,
+                cee_avere,
                 sezione,
                 round(debit, 2),
                 round(credit, 2),

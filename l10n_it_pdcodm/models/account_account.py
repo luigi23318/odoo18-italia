@@ -40,6 +40,26 @@ class AccountAccount(models.Model):
         help="Riferimento alla voce CEE associata, calcolato automaticamente "
              "dal codice CEE.",
     )
+    l10n_it_pdcodm_cee_code_dare = fields.Char(
+        string="Codice CEE (saldo DARE)",
+        size=20,
+        tracking=True,
+        help="Codice CEE da usare nell'export bilancio Passepartout quando "
+             "il saldo del conto è di tipo DARE (attivo o costo). "
+             "Lasciare vuoto per usare il `Codice CEE` principale. "
+             "Popolare solo sui conti 'misti' che possono avere CEE diverso "
+             "a seconda del segno del saldo (es. Banca: dare=CIV1, avere=D4).",
+    )
+    l10n_it_pdcodm_cee_code_avere = fields.Char(
+        string="Codice CEE (saldo AVERE)",
+        size=20,
+        tracking=True,
+        help="Codice CEE da usare nell'export bilancio Passepartout quando "
+             "il saldo del conto è di tipo AVERE (passivo o ricavo). "
+             "Lasciare vuoto per usare il `Codice CEE` principale. "
+             "Popolare solo sui conti 'misti' che possono avere CEE diverso "
+             "a seconda del segno del saldo.",
+    )
     l10n_it_pdcodm_ires_deductibility = fields.Float(
         string="Deducibilità IRES (%)",
         default=0.0,
