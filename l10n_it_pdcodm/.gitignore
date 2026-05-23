@@ -1,0 +1,13 @@
+# Materiali di sviluppo (NON parte del modulo Odoo)
+CLAUDE.md
+context/
+briefs/
+project_l10n_it_pdcodm_status.md
+
+# Worktree Cowork
+.claude/
+
+# Artifact Python
+__pycache__/
+*.pyc
+*.pyo

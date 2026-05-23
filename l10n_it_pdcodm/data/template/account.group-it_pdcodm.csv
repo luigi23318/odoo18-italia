@@ -1,0 +1,70 @@
+id,name,code_prefix_start,code_prefix_end,parent_id
+group_1,1. Attivo Patrimoniale,1,1,
+group_2,2. Passivo Patrimoniale,2,2,
+group_3,3. Patrimonio Netto,3,3,
+group_4,4. Conti d'Ordine,4,4,
+group_6,6. Costi della Produzione,6,6,
+group_7,7. Ricavi della Produzione,7,7,
+group_8,8. Proventi e Oneri Finanziari,8,8,
+group_9,9. Imposte sul Reddito,9,9,
+group_100,100 Crediti verso Soci,100,100,group_1
+group_110,110 Immobilizzazioni Immateriali (valore lordo),110,110,group_1
+group_118,118 Immobilizzazioni Immateriali - Svalutazioni,118,118,group_1
+group_119,119 Immobilizzazioni Immateriali - Fondi Ammortamento,119,119,group_1
+group_120,120 Immobilizzazioni Materiali (valore lordo),120,120,group_1
+group_128,128 Immobilizzazioni Materiali - Svalutazioni,128,128,group_1
+group_129,129 Immobilizzazioni Materiali - Fondi Ammortamento,129,129,group_1
+group_130,130 Immobilizzazioni Finanziarie,130,130,group_1
+group_140,140 Rimanenze,140,140,group_1
+group_150,150 Crediti verso Clienti,150,150,group_1
+group_151,151 Crediti verso Controllate/Collegate/Controllanti,151,151,group_1
+group_152,152 Crediti verso Consociate,152,152,group_1
+group_160,160 Crediti Tributari,160,160,group_1
+group_162,162 Imposte Anticipate,162,162,group_1
+group_163,163 Altri Crediti,163,163,group_1
+group_170,170 Attività Finanziarie non immobilizzate,170,170,group_1
+group_180,180 Banche - Depositi bancari e postali,180,180,group_1
+group_181,181 Assegni,181,181,group_1
+group_182,182 Cassa e Valori,182,182,group_1
+group_190,190 Ratei e Risconti Attivi,190,190,group_1
+group_210,210 Fondi per Rischi e Oneri,210,210,group_2
+group_220,220 Trattamento di Fine Rapporto,220,220,group_2
+group_230,"230 Debiti Finanziari (obbligazioni, banche, soci, altri)",230,230,group_2
+group_240,240 Acconti da Clienti,240,240,group_2
+group_250,250 Debiti verso Fornitori,250,250,group_2
+group_251,251 Debiti rappresentati da titoli di credito,251,251,group_2
+group_252,252 Debiti verso Controllate/Collegate/Controllanti,252,252,group_2
+group_260,260 Debiti Tributari,260,260,group_2
+group_280,280 Altri Debiti,280,280,group_2
+group_290,290 Ratei e Risconti Passivi,290,290,group_2
+group_300,300 Capitale Sociale,300,300,group_3
+group_301,301 Riserva da Sovrapprezzo,301,301,group_3
+group_302,302 Riserve di Rivalutazione,302,302,group_3
+group_303,303 Riserva Legale,303,303,group_3
+group_304,304 Riserve Statutarie,304,304,group_3
+group_305,305 Altre Riserve,305,305,group_3
+group_308,308 Utile (Perdita) dell'Esercizio,308,308,group_3
+group_309,309 Riserva Negativa per Azioni Proprie,309,309,group_3
+group_400,400 Conti d'Ordine,400,400,group_4
+group_600,600 Costi per Materie e Merci,600,600,group_6
+group_610,610 Costi per Servizi,610,610,group_6
+group_620,620 Costi per Godimento Beni di Terzi,620,620,group_6
+group_630,630 Costi del Personale,630,630,group_6
+group_640,640 Ammortamenti,640,640,group_6
+group_645,645 Svalutazioni,645,645,group_6
+group_650,650 Variazioni delle Rimanenze,650,650,group_6
+group_660,660 Accantonamenti per Rischi,660,660,group_6
+group_665,665 Altri Accantonamenti,665,665,group_6
+group_670,670 Oneri Diversi di Gestione,670,670,group_6
+group_700,700 Ricavi delle Vendite e Prestazioni,700,700,group_7
+group_710,710 Variazioni Rimanenze Prodotti,710,710,group_7
+group_720,720 Variazioni Lavori in Corso,720,720,group_7
+group_730,730 Incrementi di Immobilizzazioni per Lavori Interni,730,730,group_7
+group_740,740 Altri Ricavi e Proventi,740,740,group_7
+group_800,800 Proventi da Partecipazioni,800,800,group_8
+group_810,810 Altri Proventi Finanziari,810,810,group_8
+group_820,820 Interessi e Altri Oneri Finanziari,820,820,group_8
+group_830,830 Utili e Perdite su Cambi,830,830,group_8
+group_840,840 Rivalutazioni di Attività Finanziarie,840,840,group_8
+group_845,845 Svalutazioni di Attività Finanziarie,845,845,group_8
+group_900,900 Imposte sul Reddito,900,900,group_9

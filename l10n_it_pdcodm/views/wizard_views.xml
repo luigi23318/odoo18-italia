@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Wizard di setup PdC OdooManager (one-shot, opzione C).
+        Action lanciata dal bottone "Configura PdC OdooManager" sul
+        form res.company (vedi views/res_company_views.xml).
+        SPEC 7.1 — versione semplificata 1-screen.
+    -->
+
+    <record id="view_pdcodm_setup_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_it_pdcodm.setup.wizard.form</field>
+        <field name="model">l10n_it_pdcodm.setup.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Configura PdC OdooManager">
+                <sheet>
+                    <field name="company_id" invisible="1"/>
+                    <field name="state" invisible="1"/>
+
+                    <!-- ============ STATE: form (configurazione) ============ -->
+                    <div invisible="state != 'form'">
+                        <div class="alert alert-info" role="alert">
+                            <h4>Setup PdC OdooManager per
+                                <field name="company_id" readonly="1" nolabel="1"
+                                       options="{'no_open': True}" class="oe_inline"/>
+                            </h4>
+                            <p>
+                                L'operazione carica i ~2100 conti contabili
+                                italiani professionali, configura le property
+                                accounts e crea i giornali standard. Dura
+                                circa <strong>1 minuto</strong>; non chiudere
+                                la finestra fino al completamento.
+                            </p>
+                            <p>
+                                <strong>Attenzione</strong>: dopo la prima
+                                scrittura contabile, il PdC diventa
+                                permanente e non più modificabile.
+                            </p>
+                        </div>
+
+                        <group>
+                            <group string="Configurazione">
+                                <field name="regime" widget="radio"/>
+                                <field name="strict_mode"/>
+                                <field name="include_storico"/>
+                                <field name="create_journals"/>
+                                <field name="enable_analytic"/>
+                            </group>
+                            <group string="Anteprima">
+                                <field name="preview_account_count" readonly="1"/>
+                                <field name="preview_deprecated_count" readonly="1"/>
+                                <field name="preview_total_count" readonly="1"/>
+                                <field name="preview_estimated_seconds"
+                                       readonly="1" string="Tempo stimato (s)"/>
+                            </group>
+                        </group>
+                    </div>
+
+                    <!-- ============ STATE: done (esito) ============ -->
+                    <div invisible="state != 'done'">
+                        <div class="alert alert-success" role="alert">
+                            <h3>Setup completato!</h3>
+                            <p>Il PdC OdooManager è stato caricato sull'azienda. Riepilogo:</p>
+                            <pre><field name="result_summary" nolabel="1" readonly="1"/></pre>
+                            <p><strong>Prossimi passi consigliati:</strong></p>
+                            <ul>
+                                <li>Verifica i conti caricati: Contabilità → Configurazione → Piano dei conti</li>
+                                <li>Configura le sequenze dei giornali (numerazione fatture, ecc.)</li>
+                                <li>Imposta le tasse IVA italiane se necessario</li>
+                                <li>Esegui un test di scrittura prima di andare in produzione</li>
+                            </ul>
+                        </div>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_load_pdc"
+                            type="object"
+                            string="Carica PdC OdooManager"
+                            class="btn-primary"
+                            invisible="state != 'form'"
+                            confirm="Confermi il caricamento del PdC OdooManager? L'operazione richiede circa 1 minuto e non è annullabile."/>
+                    <button string="Annulla"
+                            class="btn-secondary"
+                            special="cancel"
+                            invisible="state != 'form'"/>
+                    <button name="action_close"
+                            type="object"
+                            string="Chiudi"
+                            class="btn-primary"
+                            invisible="state != 'done'"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pdcodm_setup_wizard" model="ir.actions.act_window">
+        <field name="name">Configura PdC OdooManager</field>
+        <field name="res_model">l10n_it_pdcodm.setup.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!--
+        Wizard di disinstallazione PdC OdooManager (Sessione 7, SPEC 7.2).
+        Action lanciata dal bottone "Disinstalla PdC OdooManager" sul
+        form res.company. Permesso solo se enabled=True AND non locked
+        AND zero scritture.
+    -->
+
+    <record id="view_pdcodm_uninstall_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_it_pdcodm.uninstall.wizard.form</field>
+        <field name="model">l10n_it_pdcodm.uninstall.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Disinstalla PdC OdooManager">
+                <sheet>
+                    <field name="company_id" invisible="1"/>
+                    <field name="state" invisible="1"/>
+
+                    <!-- ============ STATE: form ============ -->
+                    <div invisible="state != 'form'">
+                        <div class="alert alert-warning" role="alert">
+                            <h4>Disinstallazione PdC OdooManager per
+                                <field name="company_id" readonly="1" nolabel="1"
+                                       options="{'no_open': True}" class="oe_inline"/>
+                            </h4>
+                            <p>
+                                Questa operazione rimuove dalla company i
+                                conti contabili del PdC OdooManager e i
+                                giornali creati, disattiva il flag PdC, e
+                                ripristina il PdC <strong>l10n_it standard</strong>
+                                di Odoo (188 conti italiani di base).
+                                <strong>Permessa solo su aziende senza
+                                scritture contabili</strong> (anche in bozza).
+                            </p>
+                            <p>
+                                L'operazione è <strong>distruttiva</strong>:
+                                non è annullabile e cancella record dal database.
+                            </p>
+                        </div>
+
+                        <group string="Stato corrente">
+                            <field name="move_count" readonly="1"/>
+                            <field name="account_count" readonly="1"/>
+                            <field name="journal_count" readonly="1"/>
+                        </group>
+
+                        <div class="alert alert-danger" role="alert"
+                             invisible="move_count == 0">
+                            <p>
+                                <strong>Disinstallazione NON permessa</strong>:
+                                la company ha <field name="move_count" nolabel="1"
+                                                     readonly="1" class="oe_inline"/>
+                                scritture contabili. Per cambiare PdC, crea
+                                una nuova azienda.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- ============ STATE: done ============ -->
+                    <div invisible="state != 'done'">
+                        <div class="alert alert-success" role="alert">
+                            <h3>Disinstallazione completata.</h3>
+                            <pre><field name="result_summary" nolabel="1" readonly="1"/></pre>
+                            <p>
+                                <strong>Prossimi passi consigliati:</strong>
+                            </p>
+                            <ul>
+                                <li>Verifica i conti rimasti: Contabilità → Configurazione → Piano dei conti (~188 conti l10n_it).</li>
+                                <li>Configura sequenze e tasse IVA dei nuovi giornali italiani standard.</li>
+                                <li>Se vuoi tornare al PdC OdooManager più ricco, lancia di nuovo il wizard di setup.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_confirm"
+                            type="object"
+                            string="Conferma disinstallazione"
+                            class="btn-danger"
+                            invisible="state != 'form' or move_count != 0"
+                            confirm="Conferma la disinstallazione del PdC OdooManager? L'operazione cancella conti e giornali dalla company. Non è annullabile."/>
+                    <button string="Annulla"
+                            class="btn-secondary"
+                            special="cancel"
+                            invisible="state != 'form'"/>
+                    <button name="action_close"
+                            type="object"
+                            string="Chiudi"
+                            class="btn-primary"
+                            invisible="state != 'done'"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pdcodm_uninstall_wizard" model="ir.actions.act_window">
+        <field name="name">Disinstalla PdC OdooManager</field>
+        <field name="res_model">l10n_it_pdcodm.uninstall.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!--
+        Wizard "Duplica conto" (Sessione 9, SPEC 7.4).
+        Crea un conto origin='user' partendo da un conto esistente
+        come template. Accessibile dal menu "Operazioni" e dal
+        bottone "Duplica" nel form di account.account.
+    -->
+
+    <record id="view_pdcodm_duplicate_account_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_it_pdcodm.duplicate.account.wizard.form</field>
+        <field name="model">l10n_it_pdcodm.duplicate.account.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Duplica conto del PdC OdooManager">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <p>
+                            Crea un nuovo conto contabile come copia di
+                            un conto esistente. Il nuovo conto avrà
+                            <strong>origine "utente"</strong> e sarà
+                            modificabile finché non sarà usato in una
+                            scrittura.
+                        </p>
+                        <p>
+                            Eredita tipo, CEE, deducibilità IRES/IRAP e
+                            regimi dal conto modello. Codice e descrizione
+                            sono indicati separatamente.
+                        </p>
+                    </div>
+                    <group>
+                        <group string="Conto modello">
+                            <field name="source_account_id"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   domain="[('company_ids', 'in', uid)]"/>
+                            <field name="source_code" readonly="1"/>
+                            <field name="source_name" readonly="1"/>
+                            <field name="source_account_type" readonly="1"/>
+                            <field name="source_cee_code" readonly="1"/>
+                        </group>
+                        <group string="Nuovo conto">
+                            <field name="new_code"
+                                   placeholder="es. 600500"/>
+                            <field name="new_name"
+                                   placeholder="es. Materie prime - linea Beta"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_create"
+                            type="object"
+                            string="Crea conto"
+                            class="btn-primary"/>
+                    <button string="Annulla"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pdcodm_duplicate_account_wizard" model="ir.actions.act_window">
+        <field name="name">Duplica conto</field>
+        <field name="res_model">l10n_it_pdcodm.duplicate.account.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!--
+        Wizard "Validazione coerenza" (Sessione 9, SPEC 7.5).
+        Esegue check di integrità sul PdC e mostra anomalie in un
+        riquadro di testo.
+    -->
+
+    <record id="view_pdcodm_validate_chart_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_it_pdcodm.validate.chart.wizard.form</field>
+        <field name="model">l10n_it_pdcodm.validate.chart.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Validazione PdC OdooManager">
+                <sheet>
+                    <field name="state" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
+
+                    <div invisible="state != 'form'">
+                        <div class="alert alert-info" role="alert">
+                            <p>
+                                Esegue una validazione completa del PdC
+                                OdooManager sull'azienda corrente:
+                            </p>
+                            <ul>
+                                <li>chart template impostato</li>
+                                <li>conti standard senza codice CEE</li>
+                                <li>codici CEE non presenti nel modello voci CEE</li>
+                                <li>codici di conto duplicati</li>
+                                <li>percentuali di deducibilità fuori range 0-100</li>
+                                <li>regime fiscale dell'azienda impostato</li>
+                            </ul>
+                            <p>
+                                L'operazione è solo di lettura: non
+                                modifica dati.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div invisible="state != 'done'">
+                        <h3>Esito validazione</h3>
+                        <pre><field name="issues" nolabel="1" readonly="1"/></pre>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_validate"
+                            type="object"
+                            string="Esegui validazione"
+                            class="btn-primary"
+                            invisible="state != 'form'"/>
+                    <button string="Annulla"
+                            class="btn-secondary"
+                            special="cancel"
+                            invisible="state != 'form'"/>
+                    <button name="action_close"
+                            type="object"
+                            string="Chiudi"
+                            class="btn-primary"
+                            invisible="state != 'done'"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pdcodm_validate_chart_wizard" model="ir.actions.act_window">
+        <field name="name">Validazione coerenza PdC</field>
+        <field name="res_model">l10n_it_pdcodm.validate.chart.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!--
+        Menu items "Operazioni → Duplica conto" e "Operazioni →
+        Validazione coerenza", dichiarati qui (vicino alle loro
+        action) perché il file `menus.xml` viene caricato PRIMA di
+        questo file e non potrebbe risolvere i riferimenti alle action.
+    -->
+    <menuitem id="menu_l10n_it_pdcodm_duplicate_account"
+              name="Duplica conto"
+              parent="menu_l10n_it_pdcodm_operations"
+              action="action_pdcodm_duplicate_account_wizard"
+              sequence="10"/>
+
+    <menuitem id="menu_l10n_it_pdcodm_validate_chart"
+              name="Validazione coerenza"
+              parent="menu_l10n_it_pdcodm_operations"
+              action="action_pdcodm_validate_chart_wizard"
+              sequence="20"/>
+
+</odoo>

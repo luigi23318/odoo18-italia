@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Estensione del form di res.company:
+        aggiunge la page "Piano dei Conti Italiano" con i 6 campi della
+        Sessione 4 (flag attivazione, regime, lock, strict_mode, ecc.)
+        e il bottone "Configura PdC OdooManager" sotto al banner info.
+
+        NOTA: il bottone è SEMPRE visibile (no `invisible=`) per evitare
+        il bug "primo click navigate via" osservato quando il button è
+        nascosto/mostrato in base ad espressioni che ricalcolano durante
+        un save automatico (es. dopo toggle del flag). Il wizard ha già
+        il check "se PdC già attivo, raise UserError" — quindi cliccare
+        il button su una company già configurata produce un errore
+        informativo invece di un'operazione duplicata.
+    -->
+
+    <record id="view_company_form_l10n_it_pdcodm" model="ir.ui.view">
+        <field name="name">res.company.form.l10n_it_pdcodm</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook/page[@name='general_info']" position="after">
+                <page name="l10n_it_pdcodm" string="Piano dei Conti Italiano">
+                    <!-- Hidden per espressioni invisible= sugli altri campi -->
+                    <field name="l10n_it_pdcodm_enabled" invisible="1"/>
+                    <field name="l10n_it_pdcodm_locked" invisible="1"/>
+
+                    <group>
+                        <group string="Configurazione PdC"
+                               invisible="not l10n_it_pdcodm_enabled">
+                            <!--
+                                Il flag `l10n_it_pdcodm_enabled` è gestito
+                                ESCLUSIVAMENTE dai wizard (setup Sessione 6,
+                                disinstallazione Sessione 7). Non è visibile
+                                in UI a nessuno, nemmeno all'admin: evita il
+                                bug doppio click + UX più pulita.
+                                Per recovery in casi atipici: `odoo shell` o
+                                developer mode.
+
+                                Quando enabled=True, l'utente vede regime,
+                                strict_mode, include_storico — equivalente
+                                informativo a "il flag è attivo".
+                            -->
+                            <field name="l10n_it_pdcodm_regime"
+                                   readonly="l10n_it_pdcodm_locked"/>
+                            <field name="l10n_it_pdcodm_strict_mode"/>
+                            <field name="l10n_it_pdcodm_include_storico"/>
+                        </group>
+                        <group string="Stato operativo"
+                               invisible="not l10n_it_pdcodm_enabled">
+                            <field name="l10n_it_pdcodm_locked"
+                                   widget="boolean_toggle"
+                                   readonly="1"/>
+                            <field name="l10n_it_pdcodm_locked_date"
+                                   readonly="1"
+                                   invisible="not l10n_it_pdcodm_locked"/>
+                        </group>
+                    </group>
+
+                    <!-- Banner info: visibile solo se PdC non attivato -->
+                    <div class="alert alert-info" role="alert"
+                         invisible="l10n_it_pdcodm_enabled or l10n_it_pdcodm_locked">
+                        <p>
+                            <strong>Setup contabile non ancora completato.</strong>
+                            L'azienda non ha ancora il Piano dei Conti
+                            OdooManager attivo. Usa il pulsante qui sotto
+                            per lanciare il wizard guidato e caricare
+                            il PdC con il regime fiscale scelto.
+                        </p>
+                    </div>
+
+                    <!--
+                        Bottoni di gestione PdC OdooManager.
+                        - "Configura": visibile solo se PdC non attivato e non locked.
+                        - "Disinstalla": visibile solo se PdC attivato e non locked.
+                          (Quando locked = ci sono scritture → disinstallazione
+                          permessa solo via nuova azienda).
+                    -->
+                    <div class="mb-3"
+                         invisible="l10n_it_pdcodm_enabled or l10n_it_pdcodm_locked">
+                        <button name="action_open_pdcodm_setup_wizard"
+                                type="object"
+                                string="Configura PdC OdooManager"
+                                class="btn btn-primary"/>
+                    </div>
+                    <div class="mb-3"
+                         invisible="not l10n_it_pdcodm_enabled or l10n_it_pdcodm_locked">
+                        <button name="action_open_pdcodm_uninstall_wizard"
+                                type="object"
+                                string="Disinstalla PdC OdooManager"
+                                class="btn btn-danger"/>
+                    </div>
+
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not l10n_it_pdcodm_locked">
+                        <p>
+                            <strong>PdC in modalità operativa.</strong>
+                            L'azienda ha scritture contabili registrate.
+                            Il setup contabile è bloccato: non è possibile
+                            modificare regime, piano dei conti, valuta o paese.
+                        </p>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

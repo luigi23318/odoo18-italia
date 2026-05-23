@@ -1,0 +1,205 @@
+id,code,description,section,statement,side
+cee_section_AA,AA,"A) Crediti verso soci per versamenti ancora dovuti, Parte da richiamare",SP_ATT_A,Stato Patrimoniale,Attivo
+cee_section_AB,AB,"A) Crediti verso soci per versamenti ancora dovuti, Parte richiamata",SP_ATT_A,Stato Patrimoniale,Attivo
+cee_section_BI1,BI1,B) Immobilizzazioni immateriali — costi di impianto e di ampliamento — Valore storico/valore lordo,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI1A,BI1A,B) Immobilizzazioni immateriali — costi di impianto e di ampliamento — Fondo ammortamento/ammortamenti,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI1B,BI1B,B) Immobilizzazioni immateriali — costi di impianto e di ampliamento — Svalutazioni,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI2,BI2,B) Immobilizzazioni immateriali — costi di sviluppo — Valore storico/valore lordo,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI2A,BI2A,B) Immobilizzazioni immateriali — costi di sviluppo — Fondo ammortamento/ammortam.,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI2B,BI2B,B) Immobilizzazioni immateriali — costi di sviluppo — Svalutazioni,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI3,BI3,B) Immobilizzazioni immateriali — diritti di brevetto industriale e diritti di utilizzazione delle opere dell'ingegno — Val.storico/lordo,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI3A,BI3A,B) Immobilizzazioni immateriali — diritti di brevetto industriale e diritti di utilizzazione delle opere dell'ingegno — Fondo ammortam.,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI3B,BI3B,B) Immobilizzazioni immateriali — diritti di brevetto industriale e diritti di utilizzazione delle opere dell'ingegno — Svalutazioni,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI4,BI4,"B) Immobilizzazioni immateriali — concessioni, licenze, marchi e diritti simili — Valore storico/valore lordo",SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI4A,BI4A,"B) Immobilizzazioni immateriali — concessioni, licenze, marchi e diritti simili — Fondo ammortamento/ammort.",SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI4B,BI4B,"B) Immobilizzazioni immateriali — concessioni, licenze, marchi e diritti simili — Svalutazioni",SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI5,BI5,B) Immobilizzazioni immateriali — Avviamento — Valore storico/valore lordo,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI5A,BI5A,B) Immobilizzazioni immateriali — Avviamento — Fondo ammortamento/ammortamenti,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI5B,BI5B,B) Immobilizzazioni immateriali — Avviamento — Svalutazioni,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI6,BI6,B) Immobilizzazioni immateriali — Immobilizzazioni in corso e acconti — Valore storico/valore lordo,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI6B,BI6B,B) Immobilizzazioni immateriali — Immobilizzazioni in corso e acconti — Svalutazioni,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI7,BI7,B) Immobilizzazioni immateriali — Altre — Valore storico/valore lordo,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI7A,BI7A,B) Immobilizzazioni immateriali — Altre — Fondo ammortamento/ammortamenti,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BI7B,BI7B,B) Immobilizzazioni immateriali — Altre — Svalutazioni,SP_ATT_BI,Stato Patrimoniale,Attivo
+cee_section_BII1,BII1,B) Immobilizzazioni materiali  —  Terreni e fabbricati — Valore storico/valore lordo,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII1A,BII1A,B) Immobilizzazioni materiali  —  Terreni e fabbricati — Fondo ammortamento/ammortamenti,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII1B,BII1B,B) Immobilizzazioni materiali  —  Terreni e fabbricati — Svalutazioni,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII2,BII2,B) Immobilizzazioni materiali  —  Impianti e macchinario — Valore storico/valore lordo,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII2A,BII2A,B) Immobilizzazioni materiali  —  Impianti e macchinario — Fondo ammortamento/ammortamenti,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII2B,BII2B,B) Immobilizzazioni materiali  —  Impianti e macchinario — Svalutazioni,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII3,BII3,B) Immobilizzazioni materiali  —  Attrezzature industriali e commerciali — Valore storico/valore lordo,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII3A,BII3A,B) Immobilizzazioni materiali  —  Attrezzature industriali e commerciali — Fondo ammortamento/ammortamenti,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII3B,BII3B,B) Immobilizzazioni materiali  —  Attrezzature industriali e commerciali — Svalutazioni,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII4,BII4,B) Immobilizzazioni materiali  —  Altri beni — Valore storico/valore lordo,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII4A,BII4A,B) Immobilizzazioni materiali  —  Altri beni — Fondo ammortamento/ammortamenti,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII4B,BII4B,B) Immobilizzazioni materiali  —  Altri beni — Svalutazioni,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII5,BII5,B) Immobilizzazioni materiali  —  Immobilizzazioni in corso ed acconti — Valore storico/valore lordo,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BII5B,BII5B,B) Immobilizzazioni materiali  —  Immobilizzazioni in corso ed acconti — Svalutazioni,SP_ATT_BII,Stato Patrimoniale,Attivo
+cee_section_BIII1A,BIII1A,B) Immobilizzazioni finanziarie — partecipazioni in — a) imprese controllate,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII1B,BIII1B,B) Immobilizzazioni finanziarie — partecipazioni in — b) imprese collegate,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII1C,BIII1C,B) Immobilizzazioni finanziarie — partecipazioni in — c) imprese controllanti,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII1D,BIII1D,B) Immobilizzazioni finanziarie — partecipazioni in — d) imprese sottoposte al controllo delle controllanti,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII1DBIS,BIII1DBIS,B) Immobilizzazioni finanziarie — partecipazioni in — d-bis) altre imprese,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2A1,BIII2A1,B) Immobilizzazioni finanziarie — crediti — a) verso imprese controllate — esigibili entro l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2A2,BIII2A2,B) Immobilizzazioni finanziarie — crediti — a) verso imprese controllate — esigibili oltre l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2B1,BIII2B1,B) Immobilizzazioni finanziarie — crediti — b) verso imprese collegate — esigibili entro l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2B2,BIII2B2,B) Immobilizzazioni finanziarie — crediti — b) verso imprese collegate — esigibili oltre l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2C1,BIII2C1,B) Immobilizzazioni finanziarie — crediti — c) verso controllanti — esigibili entro l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2C2,BIII2C2,B) Immobilizzazioni finanziarie — crediti — c) verso controllanti — esigibili oltre l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2D1,BIII2D1,B) Immobilizzazioni finanziarie — crediti — d) verso imprese sottoposte al controllo delle controllanti — esigibili entro l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2D2,BIII2D2,B) Immobilizzazioni finanziarie — crediti — d) verso imprese sottoposte al controllo delle controllanti — esigibili oltre l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2DBIS1,BIII2DBIS1,B) Immobilizzazioni finanziarie — crediti — d-bis) verso altri — esigibili entro l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII2DBIS2,BIII2DBIS2,B) Immobilizzazioni finanziarie — crediti — d-bis) verso altri — esigibili oltre l'esercizio successivo,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII3,BIII3,B) Immobilizzazioni finanziarie — altri titoli,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_BIII4,BIII4,B) Immobilizzazioni finanziarie — strumenti finanziari derivati attivi,SP_ATT_BIII,Stato Patrimoniale,Attivo
+cee_section_CI1,CI1,"C) Attivo circolante — Rimanenze — materie prime, sussidiarie e di consumo",SP_ATT_CI,Stato Patrimoniale,Attivo
+cee_section_CI2,CI2,C) Attivo circolante — Rimanenze — prodotti in corso di lavorazione e semilavorati,SP_ATT_CI,Stato Patrimoniale,Attivo
+cee_section_CI3,CI3,C) Attivo circolante — Rimanenze — lavori in corso su ordinazione,SP_ATT_CI,Stato Patrimoniale,Attivo
+cee_section_CI4,CI4,C) Attivo circolante — Rimanenze — prodotti finiti e merci,SP_ATT_CI,Stato Patrimoniale,Attivo
+cee_section_CI5,CI5,C) Attivo circolante — Rimanenze — acconti,SP_ATT_CI,Stato Patrimoniale,Attivo
+cee_section_CI6,CI6,C) Attivo circolante — Immobilizzazioni materiali destinate alla vendita,SP_ATT_CI,Stato Patrimoniale,Attivo
+cee_section_CII1A,CII1A,C) Attivo circolante — Crediti verso clienti — esigibili entro l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII1B,CII1B,C) Attivo circolante — Crediti verso clienti — esigibili oltre l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII2A,CII2A,C) Attivo circolante — Crediti verso imprese controllate — esigibili entro l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII2B,CII2B,C) Attivo circolante — Crediti verso imprese controllate — esigibili oltre l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII3A,CII3A,C) Attivo circolante — Crediti verso imprese collegate — esigibili entro l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII3B,CII3B,C) Attivo circolante — Crediti verso imprese collegate — esigibili oltre l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII4A,CII4A,C) Attivo circolante — Crediti verso controllanti — esigibili entro l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII4B,CII4B,C) Attivo circolante — Crediti verso controllanti — esigibili oltre l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII5A,CII5A,C) Attivo circolante — Crediti verso imprese sottoposte al controllo delle controllanti — esigibili entro l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII5B,CII5B,C) Attivo circolante — Crediti verso imprese sottoposte al controllo delle controllanti — esigibili oltre l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII5BISA,CII5BISA,C) Attivo circolante — Crediti crediti tributari — esigibili entro l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII5BISB,CII5BISB,C) Attivo circolante — Crediti crediti tributari — esigibili oltre l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII5TER,CII5TER,C) Attivo circolante — Crediti imposte anticipate,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII5QUATA,CII5QUATA,C) Attivo circolante — Crediti verso altri — esigibili entro l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CII5QUATB,CII5QUATB,C) Attivo circolante — Crediti verso altri — esigibili oltre l'esercizio successivo,SP_ATT_CII,Stato Patrimoniale,Attivo
+cee_section_CIII1,CIII1,C) Attivo circolante — Attività fin.che non costituiscono immobilizz.- partecipazioni in impr. controllate,SP_ATT_CIII,Stato Patrimoniale,Attivo
+cee_section_CIII2,CIII2,C) Attivo circolante — Attività fin.che non costituiscono immobilizz.- partecipazioni in impr. collegate,SP_ATT_CIII,Stato Patrimoniale,Attivo
+cee_section_CIII3,CIII3,C) Attivo circolante — Attività fin.che non costituiscono immobilizz.- partecipazioni in impr. controllanti,SP_ATT_CIII,Stato Patrimoniale,Attivo
+cee_section_CIII3BIS,CIII3BIS,C) Attivo circolante — Attività fin.che non costituiscono immobilizz.- partecipazioni in impr. sottoposte controllo controllanti,SP_ATT_CIII,Stato Patrimoniale,Attivo
+cee_section_CIII4,CIII4,C) Attivo circolante — Attività fin.che non costituiscono immobilizz.- altre partecipazioni,SP_ATT_CIII,Stato Patrimoniale,Attivo
+cee_section_CIII5,CIII5,C) Attivo circolante — Attività fin.che non costituiscono immobilizz.- strumenti finanziari derivati attivi,SP_ATT_CIII,Stato Patrimoniale,Attivo
+cee_section_CIII6,CIII6,C) Attivo circolante — Attività fin.che non costituiscono immobilizz.- altri titoli,SP_ATT_CIII,Stato Patrimoniale,Attivo
+cee_section_CIII7,CIII7,C) Attivo circolante — Attività fin.che non costituiscono immobilizz.- attività per la gestione accentrata della tesoreria,SP_ATT_CIII,Stato Patrimoniale,Attivo
+cee_section_CIV1,CIV1,C) Attivo circolante — Disponibilità liquide — depositi bancari e postali,SP_ATT_CIV,Stato Patrimoniale,Attivo
+cee_section_CIV2,CIV2,C) Attivo circolante — Disponibilità liquide — assegni,SP_ATT_CIV,Stato Patrimoniale,Attivo
+cee_section_CIV3,CIV3,C) Attivo circolante — Disponibilità liquide — danaro e valori in cassa,SP_ATT_CIV,Stato Patrimoniale,Attivo
+cee_section_D,D,D) Ratei e risconti,SP_ATT_D,Stato Patrimoniale,Attivo
+cee_section_AI,AI,I)   — Capitale,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AII,AII,II)  — Riserva da soprapprezzo delle azioni,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AIII,AIII,III) — Riserve di rivalutazione,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AIV,AIV,IV)  — Riserva legale,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AV,AV,V)   — Riserve statutarie,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI1,AVI1,VI)  — Altre riserve distintamente indicate — Riserva straordinaria,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI2,AVI2,VI)  — Altre riserve distintamente indicate — Riserva da deroghe ex articolo 2423 codice civile,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI3,AVI3,VI)  — Altre riserve distintamente indicate — Riserva azioni (quote) della società controllante,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI4,AVI4,VI)  — Altre riserve distintamente indicate — Riserva da rivalutazione delle partecipazioni,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI5,AVI5,VI)  — Altre riserve distintamente indicate — Versamenti in conto aumento di capitale,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI6,AVI6,VI)  — Altre riserve distintamente indicate — Versamenti in conto futuro aumento di capitale,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI7,AVI7,VI)  — Altre riserve distintamente indicate — Versamenti in conto capitale,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI8,AVI8,VI)  — Altre riserve distintamente indicate — Versamenti a copertura perdite,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI9,AVI9,VI)  — Altre riserve distintamente indicate — Riserva da riduzione capitale sociale,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI10,AVI10,VI)  — Altre riserve distintamente indicate — Riserva avanzo di fusione,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI11,AVI11,VI)  — Altre riserve distintamente indicate — Riserva per utili su cambi non realizzati,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI12,AVI12,VI)  — Altre riserve distintamente indicate — Riserva da conguaglio utili in corso,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVI13,AVI13,VI)  — Altre riserve distintamente indicate — Varie altre riserve,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVII,AVII,VII) — Riserva per operazioni di copertura dei flussi finanziari attesi,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AVIII,AVIII,VIII)- Utili (perdite) portati a nuovo,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AIX1,AIX1,IX)  — Perdita ripianata nell'esercizio,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_AX,AX,X)   — Riserva negativa per azioni proprie in portafoglio,SP_PAS_A,Stato Patrimoniale,Passivo
+cee_section_B1,B1,B) Fondi per rischi e oneri — per trattamento di quiescenza e obblighi simili,SP_PAS_B,Stato Patrimoniale,Passivo
+cee_section_B2,B2,"B) Fondi per rischi e oneri — per imposte, anche differite",SP_PAS_B,Stato Patrimoniale,Passivo
+cee_section_B3,B3,B) Fondi per rischi e oneri — strumenti finanziari derivati passivi,SP_PAS_B,Stato Patrimoniale,Passivo
+cee_section_B4,B4,B) Fondi per rischi e oneri — altri,SP_PAS_B,Stato Patrimoniale,Passivo
+cee_section_C,C,C) Trattamento di fine rapporto di lavoro subordinato,SP_PAS_C,Stato Patrimoniale,Passivo
+cee_section_D1A,D1A,"D) Debiti, — obbligazioni — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D1B,D1B,"D) Debiti, — obbligazioni — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D2A,D2A,"D) Debiti, — obbligazioni convertibili — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D2B,D2B,"D) Debiti, — obbligazioni convertibili — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D3A,D3A,"D) Debiti, — debiti verso soci per finanziamenti — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D3B,D3B,"D) Debiti, — debiti verso soci per finanziamenti — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D4A,D4A,"D) Debiti, — debiti verso banche — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D4B,D4B,"D) Debiti, — debiti verso banche — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D5A,D5A,"D) Debiti, — debiti verso altri finanziatori — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D5B,D5B,"D) Debiti, — debiti verso altri finanziatori — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D6A,D6A,"D) Debiti, — acconti — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D6B,D6B,"D) Debiti, — acconti — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D7A,D7A,"D) Debiti, — debiti verso fornitori — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D7B,D7B,"D) Debiti, — debiti verso fornitori — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D8A,D8A,"D) Debiti, — debiti rappresentati da titoli di credito — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D8B,D8B,"D) Debiti, — debiti rappresentati da titoli di credito — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D9A,D9A,"D) Debiti, — debiti verso imprese controllate — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D9B,D9B,"D) Debiti, — debiti verso imprese controllate — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D10A,D10A,"D) Debiti, — debiti verso imprese collegate — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D10B,D10B,"D) Debiti, — debiti verso imprese collegate — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D11A,D11A,"D) Debiti, — debiti verso controllanti — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D11B,D11B,"D) Debiti, — debiti verso controllanti — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D11BISA,D11BISA,"D) Debiti, — debiti verso imprese sottoposte al controllo delle controllanti — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D11BISB,D11BISB,"D) Debiti, — debiti verso imprese sottoposte al controllo delle controllanti — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D12A,D12A,"D) Debiti, — debiti tributari — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D12B,D12B,"D) Debiti, — debiti tributari — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D13A,D13A,"D) Debiti, — debiti verso istituti di previdenza e sicurezza sociale — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D13B,D13B,"D) Debiti, — debiti verso istituti di previdenza e sicurezza sociale — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D14A,D14A,"D) Debiti, — altri debiti — esigibili entro l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_D14B,D14B,"D) Debiti, — altri debiti — esigibili oltre l'esercizio successivo",SP_PAS_D,Stato Patrimoniale,Passivo
+cee_section_E,E,E) Ratei e risconti,SP_PAS_E,Stato Patrimoniale,Passivo
+cee_section_A1,A1,A) Valore della produzione — ricavi delle vendite e delle prestazioni,CE_A,Conto Economico,Ricavi
+cee_section_A2,A2,"A) Valore della produzione — variazioni delle rimanenze di prodotti in corso di lavorazione, semilavorati e finiti",CE_A,Conto Economico,Ricavi
+cee_section_A3,A3,A) Valore della produzione — variazioni dei lavori in corso su ordinazione,CE_A,Conto Economico,Ricavi
+cee_section_A4,A4,A) Valore della produzione — incrementi di immobilizzazioni per lavori interni,CE_A,Conto Economico,Ricavi
+cee_section_A5A,A5A,"A) Valore della produzione — altri ricavi e proventi, — contributi in conto esercizio",CE_A,Conto Economico,Ricavi
+cee_section_A5B,A5B,"A) Valore della produzione — altri ricavi e proventi, — altri",CE_A,Conto Economico,Ricavi
+cee_section_B6,B6,"B) Costi della produzione —  per materie prime, sussidiarie, di consumo e di merci",CE_B,Conto Economico,Costi
+cee_section_B7,B7,B) Costi della produzione —  per servizi,CE_B,Conto Economico,Costi
+cee_section_B8,B8,B) Costi della produzione —  per godimento di beni di terzi,CE_B,Conto Economico,Costi
+cee_section_B9A,B9A,B) Costi della produzione —  per il personale — a) salari e stipendi,CE_B,Conto Economico,Costi
+cee_section_B9B,B9B,B) Costi della produzione —  per il personale — b) oneri sociali,CE_B,Conto Economico,Costi
+cee_section_B9C,B9C,B) Costi della produzione —  per il personale — c) trattamento di fine rapporto,CE_B,Conto Economico,Costi
+cee_section_B9D,B9D,B) Costi della produzione —  per il personale — d) trattamento di quiescenza e simili,CE_B,Conto Economico,Costi
+cee_section_B9E,B9E,B) Costi della produzione —  per il personale — e) altri costi,CE_B,Conto Economico,Costi
+cee_section_B10A,B10A,B) Costi della produzione —  ammortamenti e svalutazioni — a)ammortamento delle immobilizzazioni immateriali,CE_B,Conto Economico,Costi
+cee_section_B10B,B10B,B) Costi della produzione —  ammortamenti e svalutazioni — b)ammortamento delle immobilizzazioni materiali,CE_B,Conto Economico,Costi
+cee_section_B10C,B10C,B) Costi della produzione —  ammortamenti e svalutazioni — c)altre svalutazioni delle immobilizzazioni,CE_B,Conto Economico,Costi
+cee_section_B10D,B10D,B) Costi della produzione —  ammortamenti e svalutazioni — d)sval.crediti attivo circ.e disponibilità liquide,CE_B,Conto Economico,Costi
+cee_section_B11,B11,"B) Costi della produzione —  variazioni delle rimanenze di materie prime, sussidiarie, di consumo e merci",CE_B,Conto Economico,Costi
+cee_section_B12,B12,B) Costi della produzione —  accantonamenti per rischi,CE_B,Conto Economico,Costi
+cee_section_B13,B13,B) Costi della produzione —  altri accantonamenti,CE_B,Conto Economico,Costi
+cee_section_B14,B14,B) Costi della produzione —  oneri diversi di gestione,CE_B,Conto Economico,Costi
+cee_section_C15A,C15A,"C) Proventi e oneri finanziari, — Proventi da partecipazioni — da imprese controllate",CE_C,Conto Economico,Finanziari
+cee_section_C15B,C15B,"C) Proventi e oneri finanziari, — Proventi da partecipazioni — da imprese collegate",CE_C,Conto Economico,Finanziari
+cee_section_C15C,C15C,"C) Proventi e oneri finanziari, — Proventi da partecipazioni — da imprese controllanti",CE_C,Conto Economico,Finanziari
+cee_section_C15D,C15D,"C) Proventi e oneri finanziari, — Proventi da partecipazioni — da imprese sottoposte al controllo delle controllanti",CE_C,Conto Economico,Finanziari
+cee_section_C15E,C15E,"C) Proventi e oneri finanziari, — Proventi da partecipazioni — altri",CE_C,Conto Economico,Finanziari
+cee_section_C16A1,C16A1,C) Altri proventi finanziari — da crediti iscritti nelle immobilizzazioni — da imprese controllate,CE_C,Conto Economico,Finanziari
+cee_section_C16A2,C16A2,C) Altri proventi finanziari — da crediti iscritti nelle immobilizzazioni — da imprese collegate,CE_C,Conto Economico,Finanziari
+cee_section_C16A3,C16A3,C) Altri proventi finanziari — da crediti iscritti nelle immobilizzazioni — da imprese controllanti,CE_C,Conto Economico,Finanziari
+cee_section_C16A4,C16A4,C) Altri proventi finanziari — da crediti iscritti nelle immobilizzazioni — da imprese sottoposte al controllo delle controllanti,CE_C,Conto Economico,Finanziari
+cee_section_C16A5,C16A5,C) Altri proventi finanziari — da crediti iscritti nelle immobilizzazioni — altri,CE_C,Conto Economico,Finanziari
+cee_section_C16B,C16B,C) Altri proventi finanziari — da titoli iscritti nelle immobilizzazioni che non costituiscono partecipazioni,CE_C,Conto Economico,Finanziari
+cee_section_C16C,C16C,C) Altri proventi finanziari — da titoli iscritti nell'attivo circolante che non costituiscono partecipazioni,CE_C,Conto Economico,Finanziari
+cee_section_C16D1,C16D1,C) Altri proventi finanziari — proventi diversi dai precedenti — da imprese controllate,CE_C,Conto Economico,Finanziari
+cee_section_C16D2,C16D2,C) Altri proventi finanziari — proventi diversi dai precedenti — da imprese collegate,CE_C,Conto Economico,Finanziari
+cee_section_C16D3,C16D3,C) Altri proventi finanziari — proventi diversi dai precedenti — da imprese controllanti,CE_C,Conto Economico,Finanziari
+cee_section_C16D4,C16D4,C) Altri proventi finanziari — proventi diversi dai precedenti — da imprese sottoposte al controllo delle controllanti,CE_C,Conto Economico,Finanziari
+cee_section_C16D5,C16D5,C) Altri proventi finanziari — proventi diversi dai precedenti — altri,CE_C,Conto Economico,Finanziari
+cee_section_C17A,C17A,C) Interessi e altri oneri finanziari — verso imprese controllate,CE_C,Conto Economico,Finanziari
+cee_section_C17B,C17B,C) Interessi e altri oneri finanziari — verso imprese collegate,CE_C,Conto Economico,Finanziari
+cee_section_C17C,C17C,C) Interessi e altri oneri finanziari — verso imprese controllanti,CE_C,Conto Economico,Finanziari
+cee_section_C17D,C17D,C) Interessi e altri oneri finanziari — verso imprese sottoposte al controllo delle controllanti,CE_C,Conto Economico,Finanziari
+cee_section_C17E,C17E,C) Interessi e altri oneri finanziari — altri,CE_C,Conto Economico,Finanziari
+cee_section_C17BISA,C17BISA,C) Interessi e altri oneri finanziari — utili e perdite su cambi — utili su cambi,CE_C,Conto Economico,Finanziari
+cee_section_C17BISB,C17BISB,C) Interessi e altri oneri finanziari — utili e perdite su cambi — perdite su cambi,CE_C,Conto Economico,Finanziari
+cee_section_D18A,D18A,D) Rettifiche di valore di attività e passività finanziarie — rivalutazioni di partecipazioni,CE_D,Conto Economico,Rettifiche
+cee_section_D18B,D18B,D) Rettifiche di valore di attività e passività finanziarie — rivalutazioni di immob. finanz.che non costituiscono partec.,CE_D,Conto Economico,Rettifiche
+cee_section_D18C,D18C,D) Rettifiche di valore di attività e passività finanziarie — rivalutazioni di tit.iscritti all'attivo circ.che non costit.partec.,CE_D,Conto Economico,Rettifiche
+cee_section_D18D,D18D,D) Rettifiche di valore di attività e passività finanziarie — rivalutazioni di strumenti finanziari derivati,CE_D,Conto Economico,Rettifiche
+cee_section_D18E,D18E,D) Rettifiche di valore di attività e passività finanziarie — rivalutazioni di attività finanziarie per la gestione accentrata della tesoreria,CE_D,Conto Economico,Rettifiche
+cee_section_D19A,D19A,D) Rettifiche di valore di attività e passività finanziarie — svalutazioni di partecipazioni,CE_D,Conto Economico,Rettifiche
+cee_section_D19B,D19B,D) Rettifiche di valore di attività e passività finanziarie — svalutazioni di immob. finanz. che non costit.partecipaz.,CE_D,Conto Economico,Rettifiche
+cee_section_D19C,D19C,D) Rettifiche di valore di attività e passività finanziarie — svalutazioni di titoli iscritti nell'att. circ.che non cost.partec,CE_D,Conto Economico,Rettifiche
+cee_section_D19D,D19D,D) Rettifiche di valore di attività e passività finanziarie — svalutazioni di strumenti finanziari derivati,CE_D,Conto Economico,Rettifiche
+cee_section_D19E,D19E,D) Rettifiche di valore di attività e passività finanziarie — svalutazioni di attività finanziarie per la gestione accentrata della tesoreria,CE_D,Conto Economico,Rettifiche
+cee_section_20A,20A,"20) Imposte sul reddito dell'esercizio, correnti, differite e anticipate — imposte correnti",CE_20,Conto Economico,Imposte
+cee_section_20B,20B,"20) Imposte sul reddito dell'esercizio, correnti, differite e anticipate — imposte relative a esercizi precedenti",CE_20,Conto Economico,Imposte
+cee_section_20C,20C,"20) Imposte sul reddito dell'esercizio, correnti, differite e anticipate — imposte differite e anticipate",CE_20,Conto Economico,Imposte
+cee_section_20D,20D,"20) Imposte sul reddito dell'esercizio, correnti, differite e anticipate — proventi (oneri) da adesione al regime di consolidato fiscale / trasparenza fiscale",CE_20,Conto Economico,Imposte

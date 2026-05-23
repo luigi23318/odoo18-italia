@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Strategia UX (decisione finale post Sessione 9, Addendum 3):
+        Le voci specifiche del PdC italiano sono dichiarate come
+        SUB-MENU del menu standard "Piano dei conti" di Odoo
+        (`account.menu_action_account_form`). Niente nuovo menu root
+        per evitare duplicazione visiva.
+
+        Struttura finale:
+        Contabilità → Configurazione
+        └── Piano dei conti                 [Odoo standard, action sui conti]
+            ├── Voci CEE                    [nostra]
+            ├── Gruppi di conti             [nostra: action su account.group]
+            └── Operazioni                  [container]
+                ├── Duplica conto
+                └── Validazione coerenza
+
+        Il menu padre "Piano dei conti" mantiene la propria action: cliccarlo
+        apre la lista dei conti come prima. I figli sono accessibili dalla
+        sidebar/breadcrumb.
+    -->
+
+    <!--
+        Pattern Odoo standard quando un menu con action ha sub-menu:
+        il menu padre diventa container (non cliccabile come action).
+        Per mantenere l'action accessibile, aggiungiamo un sub-menu
+        "Conti contabili" che riusa la stessa action del padre.
+        Sequence=10 (primo).
+    -->
+    <menuitem id="menu_l10n_it_pdcodm_accounts_shortcut"
+              name="Conti contabili"
+              parent="account.menu_action_account_form"
+              action="account.action_account_form"
+              groups="l10n_it_pdcodm.group_pdcodm_user"
+              sequence="10"/>
+
+    <!-- Action per la lista dei gruppi di conti.
+         In Odoo 18 standard NON c'è un'action menu utente per
+         account.group (è solo developer mode). La creo io. -->
+    <record id="action_l10n_it_pdcodm_account_group" model="ir.actions.act_window">
+        <field name="name">Gruppi di conti</field>
+        <field name="res_model">account.group</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nessun gruppo di conti definito.
+            </p>
+            <p>
+                I gruppi raggruppano i conti gerarchicamente nei report di
+                bilancio (Bilancio di Verifica, Stato Patrimoniale).
+                Il PdC OdooManager carica automaticamente 69 gruppi.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_l10n_it_pdcodm_groups"
+              name="Gruppi di conti"
+              parent="account.menu_action_account_form"
+              action="action_l10n_it_pdcodm_account_group"
+              groups="l10n_it_pdcodm.group_pdcodm_user"
+              sequence="20"/>
+
+    <!--
+        Sub-menu "Operazioni" come container sotto Piano dei conti.
+        Le voci specifiche (Duplica conto, Validazione coerenza, ecc.)
+        sono dichiarate nei rispettivi file *_views.xml.
+    -->
+    <menuitem id="menu_l10n_it_pdcodm_operations"
+              name="Operazioni"
+              parent="account.menu_action_account_form"
+              groups="l10n_it_pdcodm.group_pdcodm_manager"
+              sequence="90"/>
+
+</odoo>

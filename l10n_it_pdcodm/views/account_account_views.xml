@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Estensione delle viste di account.account:
+        - form: aggiunge la page "Localizzazione Italiana" con i 6 campi italiani.
+        - list: aggiunge i campi italiani come colonne opzionali (di default nascoste).
+        Inerita da `account.view_account_form` e `account.view_account_list`.
+    -->
+
+    <record id="view_account_form_l10n_it_pdcodm" model="ir.ui.view">
+        <field name="name">account.account.form.l10n_it_pdcodm</field>
+        <field name="model">account.account</field>
+        <field name="inherit_id" ref="account.view_account_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook/page[@name='accounting']" position="after">
+                <page name="l10n_it_pdcodm_localizzazione" string="Localizzazione Italiana">
+                    <group>
+                        <group string="Riclassificazione CEE">
+                            <field name="l10n_it_pdcodm_cee_code"
+                                   placeholder="es. B7, CII1A, BI1"/>
+                            <field name="l10n_it_pdcodm_cee_section_id"
+                                   readonly="1"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                        <group string="Origine">
+                            <field name="l10n_it_pdcodm_origin"
+                                   widget="badge"
+                                   decoration-info="l10n_it_pdcodm_origin == 'standard'"
+                                   decoration-success="l10n_it_pdcodm_origin == 'user'"
+                                   decoration-muted="l10n_it_pdcodm_origin == 'external'"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Deducibilità fiscale"
+                               invisible="account_type not in ['income', 'income_other', 'expense', 'expense_direct_cost', 'expense_depreciation']">
+                            <label for="l10n_it_pdcodm_ires_deductibility"/>
+                            <div class="o_row">
+                                <field name="l10n_it_pdcodm_ires_deductibility"/>
+                                <span>%</span>
+                            </div>
+                            <label for="l10n_it_pdcodm_irap_deductibility"/>
+                            <div class="o_row">
+                                <field name="l10n_it_pdcodm_irap_deductibility"/>
+                                <span>%</span>
+                            </div>
+                        </group>
+                        <group string="Regimi compatibili">
+                            <field name="l10n_it_pdcodm_regime"
+                                   placeholder="es. azienda_ordinaria,professionista"
+                                   nolabel="1"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_account_list_l10n_it_pdcodm" model="ir.ui.view">
+        <field name="name">account.account.list.l10n_it_pdcodm</field>
+        <field name="model">account.account</field>
+        <field name="inherit_id" ref="account.view_account_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='tag_ids']" position="after">
+                <field name="l10n_it_pdcodm_cee_code" optional="hide"/>
+                <field name="l10n_it_pdcodm_ires_deductibility" optional="hide" string="Ded. IRES %"/>
+                <field name="l10n_it_pdcodm_irap_deductibility" optional="hide" string="Ded. IRAP %"/>
+                <field name="l10n_it_pdcodm_regime" optional="hide"/>
+                <field name="l10n_it_pdcodm_origin" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_account_search_l10n_it_pdcodm" model="ir.ui.view">
+        <field name="name">account.account.search.l10n_it_pdcodm</field>
+        <field name="model">account.account</field>
+        <field name="inherit_id" ref="account.view_account_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <separator/>
+                <field name="l10n_it_pdcodm_cee_code"/>
+                <filter name="filter_origin_standard"
+                        string="Origine: PdC OdooManager"
+                        domain="[('l10n_it_pdcodm_origin', '=', 'standard')]"/>
+                <filter name="filter_origin_user"
+                        string="Origine: Utente"
+                        domain="[('l10n_it_pdcodm_origin', '=', 'user')]"/>
+                <filter name="filter_origin_external"
+                        string="Origine: Esterno"
+                        domain="[('l10n_it_pdcodm_origin', '=', 'external')]"/>
+                <group expand="0" string="Raggruppa per (italiano)">
+                    <filter name="group_by_cee_section"
+                            string="Voce CEE"
+                            context="{'group_by': 'l10n_it_pdcodm_cee_section_id'}"/>
+                    <filter name="group_by_origin"
+                            string="Origine"
+                            context="{'group_by': 'l10n_it_pdcodm_origin'}"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
