@@ -3,3 +3,4 @@ from . import pdcodm_setup_wizard
 from . import pdcodm_uninstall_wizard
 from . import pdcodm_duplicate_account
 from . import pdcodm_validate_chart
+from . import pdcodm_export_passpartout

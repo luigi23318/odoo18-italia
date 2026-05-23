@@ -351,4 +351,113 @@
               action="action_pdcodm_validate_chart_wizard"
               sequence="20"/>
 
+    <!--
+        Wizard "Esporta bilancio Passepartout" (Sessione 11, SPEC 7.3 + 9).
+        Genera 2 CSV in un ZIP per il commercialista: saldi conti del
+        periodo + tabella transcodifica per Passepartout/ADP Bilancio.
+    -->
+
+    <record id="view_pdcodm_export_passpartout_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_it_pdcodm.export.passpartout.wizard.form</field>
+        <field name="model">l10n_it_pdcodm.export.passpartout.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Esporta bilancio Passepartout">
+                <sheet>
+                    <field name="state" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
+
+                    <!-- STATE form -->
+                    <div invisible="state != 'form'">
+                        <div class="alert alert-info" role="alert">
+                            <p>
+                                Esporta un archivio ZIP contenente 2 file CSV
+                                per l'import in Passepartout / ADP Bilancio:
+                            </p>
+                            <ul>
+                                <li><strong>bilancio_saldi.csv</strong>: saldi
+                                conti del periodo (dare, avere, iniziale, finale)
+                                con codici CEE e Passepartout corrispondenti.</li>
+                                <li><strong>mapping_conti.csv</strong>: tabella
+                                completa di transcodifica per l'abbinamento
+                                iniziale (utile solo alla prima importazione).</li>
+                            </ul>
+                        </div>
+                        <group>
+                            <group string="Periodo">
+                                <field name="date_from"/>
+                                <field name="date_to"/>
+                            </group>
+                            <group string="Opzioni">
+                                <field name="export_type"/>
+                                <field name="include_zero_balance"/>
+                            </group>
+                        </group>
+                    </div>
+
+                    <!-- STATE done -->
+                    <div invisible="state != 'done'">
+                        <div class="alert alert-success" role="alert">
+                            <h3>Export completato.</h3>
+                            <p>
+                                File generati:
+                                <strong><field name="n_accounts_exported"
+                                               nolabel="1" readonly="1" class="oe_inline"/></strong>
+                                conti esportati,
+                                <strong><field name="n_mappings_exported"
+                                               nolabel="1" readonly="1" class="oe_inline"/></strong>
+                                mapping nella transcodifica.
+                            </p>
+                            <p>
+                                Clicca su <em>Scarica ZIP</em> per ottenere il
+                                file. Importa il <code>bilancio_saldi.csv</code>
+                                in Passepartout (Servizi → Personalizzazioni →
+                                Carica Saldi da File Esterni → Import dati da CSV).
+                                Il <code>mapping_conti.csv</code> è di
+                                riferimento per l'abbinamento iniziale.
+                            </p>
+                        </div>
+                        <group>
+                            <field name="attachment_id" readonly="1"
+                                   options="{'no_open': True}"/>
+                        </group>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_export"
+                            type="object"
+                            string="Esegui export"
+                            class="btn-primary"
+                            invisible="state != 'form'"/>
+                    <button string="Annulla"
+                            class="btn-secondary"
+                            special="cancel"
+                            invisible="state != 'form'"/>
+                    <button name="action_download"
+                            type="object"
+                            string="Scarica ZIP"
+                            class="btn-primary"
+                            invisible="state != 'done'"/>
+                    <button name="action_close"
+                            type="object"
+                            string="Chiudi"
+                            class="btn-secondary"
+                            invisible="state != 'done'"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pdcodm_export_passpartout_wizard" model="ir.actions.act_window">
+        <field name="name">Esporta bilancio Passepartout</field>
+        <field name="res_model">l10n_it_pdcodm.export.passpartout.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_l10n_it_pdcodm_export_passpartout"
+              name="Esporta bilancio Passepartout"
+              parent="menu_l10n_it_pdcodm_operations"
+              action="action_pdcodm_export_passpartout_wizard"
+              sequence="30"/>
+
 </odoo>
