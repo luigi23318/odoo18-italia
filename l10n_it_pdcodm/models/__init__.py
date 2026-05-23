@@ -2,6 +2,7 @@
 # NB: l10n_it_pdcodm_cee_section va PRIMA di account_account perché
 # quest'ultimo ha un Many2one computed che lo referenzia.
 from . import l10n_it_pdcodm_cee_section
+from . import l10n_it_pdcodm_passpartout_mapping
 from . import account_account
 from . import account_move
 from . import account_move_line

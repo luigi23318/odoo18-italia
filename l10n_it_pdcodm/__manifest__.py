@@ -27,9 +27,11 @@
         'security/ir.model.access.csv',
         # dati statici
         'data/l10n_it_pdcodm.cee.section.csv',
+        'data/l10n_it_pdcodm.passpartout.mapping.csv',
         # viste: menu root PRIMA, viste che vi appendono figli DOPO
         'views/menus.xml',
         'views/l10n_it_pdcodm_cee_section_views.xml',
+        'views/l10n_it_pdcodm_passpartout_mapping_views.xml',
         'views/account_account_views.xml',
         'views/wizard_views.xml',
         'views/res_company_views.xml',

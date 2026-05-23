@@ -1,6 +1,8 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_cee_section_user,cee.section user,model_l10n_it_pdcodm_cee_section,l10n_it_pdcodm.group_pdcodm_user,1,0,0,0
 access_cee_section_admin,cee.section admin,model_l10n_it_pdcodm_cee_section,l10n_it_pdcodm.group_pdcodm_administrator,1,1,1,0
+access_passpartout_mapping_user,passpartout.mapping user,model_l10n_it_pdcodm_passpartout_mapping,l10n_it_pdcodm.group_pdcodm_user,1,0,0,0
+access_passpartout_mapping_admin,passpartout.mapping admin,model_l10n_it_pdcodm_passpartout_mapping,l10n_it_pdcodm.group_pdcodm_administrator,1,1,1,1
 access_setup_wizard_admin,setup.wizard admin,model_l10n_it_pdcodm_setup_wizard,l10n_it_pdcodm.group_pdcodm_administrator,1,1,1,1
 access_uninstall_wizard_admin,uninstall.wizard admin,model_l10n_it_pdcodm_uninstall_wizard,l10n_it_pdcodm.group_pdcodm_administrator,1,1,1,1
 access_duplicate_account_wizard_manager,duplicate.account.wizard manager,model_l10n_it_pdcodm_duplicate_account_wizard,l10n_it_pdcodm.group_pdcodm_manager,1,1,1,1

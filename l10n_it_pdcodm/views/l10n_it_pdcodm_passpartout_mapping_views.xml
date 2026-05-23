@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Viste per la tabella di Transcodifica Passepartout (SPEC 4.4).
+        Le 2121 righe sono dati di interoperabilità: il PdC Administrator
+        può consultarle e modificarle (per personalizzazioni
+        company-specific); gli altri utenti vedono in sola lettura.
+    -->
+
+    <record id="view_l10n_it_pdcodm_passpartout_mapping_list" model="ir.ui.view">
+        <field name="name">l10n_it_pdcodm.passpartout.mapping.list</field>
+        <field name="model">l10n_it_pdcodm.passpartout.mapping</field>
+        <field name="arch" type="xml">
+            <list string="Transcodifica Passepartout">
+                <field name="pdcodm_code"/>
+                <field name="pdcodm_name"/>
+                <field name="passpartout_code"/>
+                <field name="passpartout_name" optional="show"/>
+                <field name="cee_code" optional="show"/>
+                <field name="mapping_type" optional="show"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
+                <field name="notes" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_l10n_it_pdcodm_passpartout_mapping_form" model="ir.ui.view">
+        <field name="name">l10n_it_pdcodm.passpartout.mapping.form</field>
+        <field name="model">l10n_it_pdcodm.passpartout.mapping</field>
+        <field name="arch" type="xml">
+            <form string="Mapping Passepartout">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="pdcodm_code"/>
+                        <h1><field name="pdcodm_code" placeholder="es. 150012"/></h1>
+                    </div>
+                    <group>
+                        <group string="Lato OdooManager">
+                            <field name="pdcodm_name"/>
+                            <field name="cee_code"/>
+                        </group>
+                        <group string="Lato Passepartout">
+                            <field name="passpartout_code" placeholder="es. 208.00241"/>
+                            <field name="passpartout_name"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="mapping_type"/>
+                            <field name="company_id"
+                                   options="{'no_create': True}"
+                                   groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group string="Note">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_l10n_it_pdcodm_passpartout_mapping_search" model="ir.ui.view">
+        <field name="name">l10n_it_pdcodm.passpartout.mapping.search</field>
+        <field name="model">l10n_it_pdcodm.passpartout.mapping</field>
+        <field name="arch" type="xml">
+            <search string="Cerca mapping">
+                <field name="pdcodm_code"/>
+                <field name="pdcodm_name"/>
+                <field name="passpartout_code"/>
+                <field name="cee_code"/>
+                <separator/>
+                <filter name="filter_1_1" string="Mapping 1:1"
+                        domain="[('mapping_type', '=', '1:1')]"/>
+                <filter name="filter_n_1" string="Mapping N:1"
+                        domain="[('mapping_type', '=', 'N:1')]"/>
+                <separator/>
+                <filter name="filter_standard" string="Solo mapping standard"
+                        domain="[('company_id', '=', False)]"/>
+                <filter name="filter_custom" string="Personalizzazioni company"
+                        domain="[('company_id', '!=', False)]"/>
+                <group expand="0" string="Raggruppa per">
+                    <filter name="group_by_mapping_type"
+                            string="Tipo mapping"
+                            context="{'group_by': 'mapping_type'}"/>
+                    <filter name="group_by_cee_code"
+                            string="Codice CEE"
+                            context="{'group_by': 'cee_code'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_l10n_it_pdcodm_passpartout_mapping" model="ir.actions.act_window">
+        <field name="name">Transcodifica Passepartout</field>
+        <field name="res_model">l10n_it_pdcodm.passpartout.mapping</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_l10n_it_pdcodm_passpartout_mapping_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nessun mapping Passepartout caricato.
+            </p>
+            <p>
+                I 2121 mapping di transcodifica OdooManager &lt;-&gt; Passepartout
+                vengono caricati automaticamente all'installazione del modulo.
+                Se la lista è vuota, controlla i log di installazione del modulo.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_l10n_it_pdcodm_passpartout_mapping"
+              name="Transcodifica Passepartout"
+              parent="account.menu_action_account_form"
+              action="action_l10n_it_pdcodm_passpartout_mapping"
+              groups="l10n_it_pdcodm.group_pdcodm_user"
+              sequence="40"/>
+
+</odoo>
