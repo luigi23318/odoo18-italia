@@ -220,13 +220,13 @@ class PdcodmSetupWizard(models.TransientModel):
         ChartTemplate = self_in_co.env['account.chart.template']
         ChartTemplate.try_loading('it_pdcodm', company_in_co, install_demo=False)
 
-        # (5) Deprecazione conti non compatibili
-        deprecated_count = self._deprecate_incompatible_accounts(company_in_co)
+        # (5) Deprecazione conti non compatibili (con context multi-company)
+        deprecated_count = self_in_co._deprecate_incompatible_accounts(company_in_co)
 
-        # (6) Giornali standard italiani
+        # (6) Giornali standard italiani (con context multi-company)
         journals_created = 0
         if self.create_journals:
-            journals_created = self._create_italian_journals(company_in_co)
+            journals_created = self_in_co._create_italian_journals(company_in_co)
 
         # (6) Riassunto + transizione
         summary_lines = [
@@ -246,6 +246,10 @@ class PdcodmSetupWizard(models.TransientModel):
         compatibile con quello della company.
 
         Ritorna il numero di conti deprecati.
+
+        NB: usa `.sudo()` su entrambe search e write per essere robusto
+        a qualsiasi context multi-company del chiamante (l'operazione
+        è legittima — parte del flusso di setup PdC).
         """
         regime = company.l10n_it_pdcodm_regime
         include_storico = company.l10n_it_pdcodm_include_storico
@@ -254,7 +258,7 @@ class PdcodmSetupWizard(models.TransientModel):
             ('company_ids', 'in', company.id),
             ('l10n_it_pdcodm_origin', '=', 'standard'),
         ])
-        to_deprecate = self.env['account.account']
+        to_deprecate = self.env['account.account'].sudo()
         for acc in accounts:
             regs = {x.strip() for x in (acc.l10n_it_pdcodm_regime or '').split(',') if x.strip()}
             if regime in regs:
@@ -263,7 +267,7 @@ class PdcodmSetupWizard(models.TransientModel):
             if 'storico' in regs and include_storico:
                 # Storico richiesto → mantengo
                 continue
-            to_deprecate |= acc
+            to_deprecate |= acc.sudo()
         if to_deprecate:
             to_deprecate.write({'deprecated': True})
         return len(to_deprecate)
