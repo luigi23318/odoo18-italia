@@ -162,11 +162,15 @@ class PdcodmSetupWizard(models.TransientModel):
         """Esegue il caricamento del PdC OdooManager sulla company.
 
         1. Validazione precondizioni (no scritture, no PdC già attivo).
-        2. Imposta i flag su `res.company`.
-        3. Caricamento template via `account.chart.template.try_loading`.
-        4. Deprecazione conti non compatibili col regime.
-        5. Creazione giornali italiani standard (opzionale).
-        6. Log esito + transizione a state='done'.
+        2. Forza il context multi-company alla company target (evita
+           errori "non hai accesso write a account.account" quando
+           l'utente lancia il wizard mentre `env.company` è diversa
+           dalla target).
+        3. Imposta i flag su `res.company`.
+        4. Caricamento template via `account.chart.template.try_loading`.
+        5. Deprecazione conti non compatibili col regime.
+        6. Creazione giornali italiani standard (opzionale).
+        7. Log esito + transizione a state='done'.
         """
         self.ensure_one()
         company = self.company_id
@@ -192,25 +196,37 @@ class PdcodmSetupWizard(models.TransientModel):
             self.strict_mode, self.create_journals,
         )
 
-        # (2) Imposta i flag
-        company.write({
+        # (2) Forza il context multi-company alla company target.
+        # Senza questo, se l'utente lancia il wizard mentre la company
+        # attiva nel selettore (env.company) è diversa da self.company_id,
+        # le scritture su account.account possono fallire con
+        # "Non hai accesso write a Conto (account.account) — passa
+        # all'azienda <target>". Il try_loading di Odoo imposta lui
+        # stesso questo context internamente, ma il company.write()
+        # e _create_italian_journals che facciamo nello stesso flow
+        # devono averlo coerente per evitare l'errore multi-company.
+        self_in_co = self.with_context(allowed_company_ids=[company.id])
+        company_in_co = company.with_env(self_in_co.env)
+
+        # (3) Imposta i flag (nel context multi-company corretto)
+        company_in_co.write({
             'l10n_it_pdcodm_enabled': True,
             'l10n_it_pdcodm_regime': self.regime,
             'l10n_it_pdcodm_strict_mode': self.strict_mode,
             'l10n_it_pdcodm_include_storico': self.include_storico,
         })
 
-        # (3) Caricamento template (~44s)
-        ChartTemplate = self.env['account.chart.template']
-        ChartTemplate.try_loading('it_pdcodm', company, install_demo=False)
+        # (4) Caricamento template (~44s)
+        ChartTemplate = self_in_co.env['account.chart.template']
+        ChartTemplate.try_loading('it_pdcodm', company_in_co, install_demo=False)
 
-        # (4) Deprecazione conti non compatibili
-        deprecated_count = self._deprecate_incompatible_accounts(company)
+        # (5) Deprecazione conti non compatibili
+        deprecated_count = self._deprecate_incompatible_accounts(company_in_co)
 
-        # (5) Giornali standard italiani
+        # (6) Giornali standard italiani
         journals_created = 0
         if self.create_journals:
-            journals_created = self._create_italian_journals(company)
+            journals_created = self._create_italian_journals(company_in_co)
 
         # (6) Riassunto + transizione
         summary_lines = [
