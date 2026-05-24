@@ -19,8 +19,16 @@ class AccountAccount(models.Model):
     """
     _inherit = 'account.account'
 
-    # Campi readonly su conti origin='standard' (SPEC 8.3)
-    _PDCODM_READONLY_ON_STANDARD = ('code', 'account_type', 'l10n_it_pdcodm_origin')
+    # Campi readonly su conti origin='standard' (SPEC 8.3).
+    # `name` è incluso perché modificarlo retroattivamente rompe la
+    # ristampa identica dei bilanci di esercizi chiusi: in Odoo il
+    # template del report legge il valore CORRENTE del campo, non
+    # quello storico al momento della scrittura. Compliance contabile
+    # italiana richiede ristampabilità immutabile dei bilanci passati.
+    # L'utente che vuole personalizzare la descrizione di un conto deve
+    # duplicare il conto come `origin='user'` (wizard "Duplica conto"),
+    # poi disattivare lo standard via `deprecated=True` se non lo usa.
+    _PDCODM_READONLY_ON_STANDARD = ('code', 'name', 'account_type', 'l10n_it_pdcodm_origin')
 
     l10n_it_pdcodm_cee_code = fields.Char(
         string="Codice CEE",

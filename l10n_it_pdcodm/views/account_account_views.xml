@@ -92,6 +92,13 @@
                 <filter name="filter_origin_external"
                         string="Origine: Esterno"
                         domain="[('l10n_it_pdcodm_origin', '=', 'external')]"/>
+                <separator/>
+                <filter name="filter_not_deprecated"
+                        string="Non deprecati (utilizzabili)"
+                        domain="[('deprecated', '=', False)]"/>
+                <filter name="filter_deprecated"
+                        string="Deprecati (non utilizzabili)"
+                        domain="[('deprecated', '=', True)]"/>
                 <group expand="0" string="Raggruppa per (italiano)">
                     <filter name="group_by_cee_section"
                             string="Voce CEE"
@@ -99,6 +106,9 @@
                     <filter name="group_by_origin"
                             string="Origine"
                             context="{'group_by': 'l10n_it_pdcodm_origin'}"/>
+                    <filter name="group_by_deprecated"
+                            string="Stato deprecazione"
+                            context="{'group_by': 'deprecated'}"/>
                 </group>
             </xpath>
         </field>
