@@ -85,21 +85,26 @@ class ResCompany(models.Model):
         """Calcola se il PdC è bloccato.
 
         Definizione di "locked": la company ha **almeno una scrittura
-        contabile CONFERMATA** (state='posted'). Le bozze e gli annullati
-        NON bloccano: un utente che ha postato per errore può tornare
-        indietro (button_draft → cancel/unlink) e il lock si scioglie
-        automaticamente.
+        contabile in bozza o confermata** (`state IN ('draft', 'posted')`).
+        Gli annullati (state='cancel') NON contano.
+
+        Razionale: anche una bozza rappresenta un'operazione contabile
+        avviata che fa riferimento ai conti del PdC. Cambiare il setup
+        contabile sotto una bozza esistente (cambio regime, cambio
+        chart_template) renderebbe la bozza inconsistente. Inoltre i
+        conti del PdC OdooManager non possono essere eliminati finché
+        ci sono `account.move.line` (anche draft) che li referenziano:
+        coerente quindi sia col vincolo Foreign Key sia con la UX
+        (bottone Disinstalla nascosto se c'è qualsiasi scrittura).
 
         Trigger esterni del recompute (override in models/account_move.py):
-        - `_post()` → quando si conferma una scrittura, il lock può scattare
-        - `button_draft()` → quando si annulla una conferma, il lock può
-          sciogliersi
-        - `unlink()` → quando si elimina una scrittura, idem
+        - `create()` → quando si crea un nuovo move (anche solo bozza)
+        - `_post()` → quando si conferma una scrittura
+        - `button_draft()` → quando si annulla una conferma
+        - `unlink()` → quando si elimina una scrittura
 
         Il `@api.depends` qui resta minimal (solo `l10n_it_pdcodm_enabled`)
-        perché un depends fine su `account.move.state` provocherebbe
-        ricompute massivi a ogni modifica di scrittura per qualsiasi
-        company del DB.
+        per evitare ricompute massivi a ogni modifica di scrittura.
         """
         for company in self:
             if not company.l10n_it_pdcodm_enabled:
@@ -108,7 +113,7 @@ class ResCompany(models.Model):
                 continue
             move_count = self.env['account.move'].sudo().search_count([
                 ('company_id', '=', company.id),
-                ('state', '=', 'posted'),
+                ('state', 'in', ('draft', 'posted')),
             ])
             was_locked = company.l10n_it_pdcodm_locked
             new_locked = move_count > 0
@@ -118,16 +123,16 @@ class ResCompany(models.Model):
                 company.l10n_it_pdcodm_locked_date = fields.Datetime.now()
                 _logger.info(
                     "PdC OdooManager: company '%s' (id=%s) entrata in "
-                    "modalità lock (%d scritture confermate).",
+                    "modalità lock (%d scritture in bozza o confermate).",
                     company.name, company.id, move_count,
                 )
             elif was_locked and not new_locked:
-                # Lock appena sciolto (tutte le scritture posted sono
-                # tornate a draft/cancelled/unlink): reset della data
+                # Lock appena sciolto: tutte le scritture (draft + posted)
+                # sono state cancellate o annullate
                 company.l10n_it_pdcodm_locked_date = False
                 _logger.info(
                     "PdC OdooManager: company '%s' (id=%s) uscita dalla "
-                    "modalità lock (nessuna scrittura confermata residua).",
+                    "modalità lock (nessuna scrittura residua).",
                     company.name, company.id,
                 )
 

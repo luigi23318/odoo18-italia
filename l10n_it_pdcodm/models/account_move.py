@@ -1,7 +1,7 @@
 # Part of l10n_it_pdcodm. See LICENSE file for full copyright and licensing details.
 import logging
 
-from odoo import _, models
+from odoo import _, api, models
 from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
@@ -29,6 +29,26 @@ class AccountMove(models.Model):
       registrata (SPEC 5.4).
     """
     _inherit = 'account.move'
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Override per ricalcolare il lock state quando viene creata
+        una nuova scrittura (anche solo bozza).
+
+        Dalla nuova definizione di lock (Sessione 12+), il PdC è
+        bloccato se ci sono scritture in stato draft OR posted.
+        Quindi una bozza appena creata deve già scattare il lock.
+
+        Skip dell'overhead se nessuna company coinvolta ha il PdC
+        OdooManager attivo (caso comune su company non-italiane).
+        """
+        moves = super().create(vals_list)
+        companies_to_recompute = moves.mapped('company_id').filtered(
+            lambda c: c.l10n_it_pdcodm_enabled and not c.l10n_it_pdcodm_locked
+        )
+        if companies_to_recompute:
+            companies_to_recompute._recompute_pdcodm_locked()
+        return moves
 
     def _post(self, soft=True):
         """Override per:
