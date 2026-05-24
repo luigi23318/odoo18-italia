@@ -61,9 +61,13 @@ class PdcodmUninstallWizard(models.TransientModel):
 
     @api.depends('company_id')
     def _compute_move_count(self):
+        # Contiamo SOLO le scritture confermate (state='posted'):
+        # le bozze NON bloccano la disinstallazione, perché l'utente
+        # può cancellarle prima del setup change.
         for w in self:
             w.move_count = self.env['account.move'].sudo().search_count([
                 ('company_id', '=', w.company_id.id),
+                ('state', '=', 'posted'),
             ])
 
     @api.depends('company_id')

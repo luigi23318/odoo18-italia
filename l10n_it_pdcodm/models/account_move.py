@@ -48,18 +48,46 @@ class AccountMove(models.Model):
 
         result = super()._post(soft=soft)
 
-        # (b) Trigger lock alla prima scrittura registrata.
-        # SPEC 5.4 — completa l'implementazione iniziata in Sessione 4
-        # (il metodo `_recompute_pdcodm_locked` su res.company era
-        # placeholder). Lockiamo al primo `_post()` (scrittura registrata),
-        # NON al create() (draft) per evitare overhead su movimenti
-        # creati implicitamente da altre operazioni Odoo.
+        # (b) Trigger lock-state recompute dopo _post.
+        # Quando una scrittura passa a 'posted', il count di posted
+        # cresce → la company può entrare in stato locked.
         companies_to_recompute = self.mapped('company_id').filtered(
             lambda c: c.l10n_it_pdcodm_enabled and not c.l10n_it_pdcodm_locked
         )
         if companies_to_recompute:
             companies_to_recompute._recompute_pdcodm_locked()
 
+        return result
+
+    def button_draft(self):
+        """Override per ricalcolare il lock state quando una scrittura
+        torna da `posted` a `draft`.
+
+        Senza questo override, il flag `l10n_it_pdcodm_locked` resta
+        True anche se l'utente ha riportato a bozza tutte le scritture
+        posted — impedendo la disinstallazione del PdC OdooManager.
+        """
+        result = super().button_draft()
+        # Recompute solo per company già lockate che usano il PdC
+        # (la transizione locked → unlocked richiede questo trigger)
+        companies_to_recompute = self.mapped('company_id').filtered(
+            lambda c: c.l10n_it_pdcodm_enabled and c.l10n_it_pdcodm_locked
+        )
+        if companies_to_recompute:
+            companies_to_recompute._recompute_pdcodm_locked()
+        return result
+
+    def unlink(self):
+        """Override per ricalcolare il lock state quando una scrittura
+        viene eliminata. Stesso pattern di `button_draft`.
+        """
+        # Salvo le company PRIMA di unlink (dopo, self è vuoto)
+        companies = self.mapped('company_id').filtered(
+            lambda c: c.l10n_it_pdcodm_enabled and c.l10n_it_pdcodm_locked
+        )
+        result = super().unlink()
+        if companies:
+            companies._recompute_pdcodm_locked()
         return result
 
     def _l10n_it_pdcodm_check_causale_coerence(self):

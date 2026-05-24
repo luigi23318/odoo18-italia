@@ -77,36 +77,52 @@ class ResCompany(models.Model):
 
     @api.depends('l10n_it_pdcodm_enabled')
     def _compute_pdcodm_locked(self):
-        """Calcola se il PdC è bloccato (esiste almeno una scrittura
-        contabile sulla company).
+        """Calcola se il PdC è bloccato.
 
-        IMPORTANTE — limitazione sessione 4:
-        Il `@api.depends` è solo su `l10n_it_pdcodm_enabled`. Il
-        "lock alla prima scrittura" (SPEC 5.4) richiede un trigger
-        esterno: l'override di `account.move._post()` (Sessione 8)
-        dovrà chiamare `company._recompute_pdcodm_locked()` quando viene
-        confermata una scrittura. Per la Sessione 4 il lock è valutato
-        correttamente quando il flag stesso viene salvato.
+        Definizione di "locked": la company ha **almeno una scrittura
+        contabile CONFERMATA** (state='posted'). Le bozze e gli annullati
+        NON bloccano: un utente che ha postato per errore può tornare
+        indietro (button_draft → cancel/unlink) e il lock si scioglie
+        automaticamente.
+
+        Trigger esterni del recompute (override in models/account_move.py):
+        - `_post()` → quando si conferma una scrittura, il lock può scattare
+        - `button_draft()` → quando si annulla una conferma, il lock può
+          sciogliersi
+        - `unlink()` → quando si elimina una scrittura, idem
+
+        Il `@api.depends` qui resta minimal (solo `l10n_it_pdcodm_enabled`)
+        perché un depends fine su `account.move.state` provocherebbe
+        ricompute massivi a ogni modifica di scrittura per qualsiasi
+        company del DB.
         """
         for company in self:
             if not company.l10n_it_pdcodm_enabled:
                 company.l10n_it_pdcodm_locked = False
+                company.l10n_it_pdcodm_locked_date = False
                 continue
             move_count = self.env['account.move'].sudo().search_count([
                 ('company_id', '=', company.id),
+                ('state', '=', 'posted'),
             ])
             was_locked = company.l10n_it_pdcodm_locked
             new_locked = move_count > 0
             company.l10n_it_pdcodm_locked = new_locked
             if new_locked and not was_locked:
-                # Imposto la data di lock all'istante della transizione.
-                # NB: non chiamo `message_post()` perché in Odoo 18 base
-                # `res.company` NON eredita da `mail.thread` (verificato
-                # nel sorgente). L'audit log resta sul logger Python.
+                # Lock appena scattato: registro la data corrente
                 company.l10n_it_pdcodm_locked_date = fields.Datetime.now()
                 _logger.info(
                     "PdC OdooManager: company '%s' (id=%s) entrata in "
-                    "modalità lock alla prima scrittura.",
+                    "modalità lock (%d scritture confermate).",
+                    company.name, company.id, move_count,
+                )
+            elif was_locked and not new_locked:
+                # Lock appena sciolto (tutte le scritture posted sono
+                # tornate a draft/cancelled/unlink): reset della data
+                company.l10n_it_pdcodm_locked_date = False
+                _logger.info(
+                    "PdC OdooManager: company '%s' (id=%s) uscita dalla "
+                    "modalità lock (nessuna scrittura confermata residua).",
                     company.name, company.id,
                 )
 
@@ -216,9 +232,12 @@ class ResCompany(models.Model):
                         ) % {'company': company.name, 'count': move_count})
                 elif not new_value and company.l10n_it_pdcodm_enabled:
                     # Transizione True → False: blocca se ci sono scritture
-                    # su conti origin='standard'
+                    # CONFERMATE (state='posted') su conti origin='standard'.
+                    # Le bozze NON bloccano: l'utente può annullarle/eliminarle
+                    # prima di disattivare il PdC.
                     move_count = self.env['account.move'].sudo().search_count([
                         ('company_id', '=', company.id),
+                        ('state', '=', 'posted'),
                         ('line_ids.account_id.l10n_it_pdcodm_origin', '=', 'standard'),
                     ])
                     if move_count > 0:
