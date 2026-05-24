@@ -57,8 +57,13 @@ class ResCompany(models.Model):
     l10n_it_pdcodm_include_storico = fields.Boolean(
         string="Includi conti storici (Amm.to anticipato)",
         default=False,
-        help="Se True, include nel piano i conti del regime 'storico' "
-             "(ammortamento anticipato, obsoleto dal 2008).",
+        help="Scelta del wizard di SETUP iniziale: se True, i conti del "
+             "regime 'storico' (ammortamento anticipato, obsoleto dal 2008) "
+             "vengono lasciati attivi al caricamento del PdC. Se False, "
+             "vengono marcati come `deprecated`. "
+             "DOPO il setup questo flag è readonly: i conti già attivi o "
+             "deprecati non vengono riconfigurati cambiando il flag — "
+             "modificarlo non avrebbe effetto pratico.",
     )
 
     # Campi sensibili che NON possono essere modificati su company lockata

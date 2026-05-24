@@ -46,7 +46,15 @@
                             <field name="l10n_it_pdcodm_regime"
                                    readonly="l10n_it_pdcodm_locked"/>
                             <field name="l10n_it_pdcodm_strict_mode"/>
-                            <field name="l10n_it_pdcodm_include_storico"/>
+                            <!--
+                                include_storico è readonly dopo il setup:
+                                viene letto SOLO dal wizard di setup
+                                iniziale per decidere quali conti storici
+                                (regime='storico', amm. anticipato) deprecare.
+                                Modificarlo dopo è ininfluente.
+                            -->
+                            <field name="l10n_it_pdcodm_include_storico"
+                                   readonly="1"/>
                         </group>
                         <group string="Stato operativo"
                                invisible="not l10n_it_pdcodm_enabled">
