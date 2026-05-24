@@ -185,19 +185,19 @@ class PdcodmSetupWizard(models.TransientModel):
         company = self.company_id
 
         # (1) Precondizioni: la company deve essere vergine.
-        # Conta scritture in bozza o confermate (esclusi gli annullati).
-        # Coerente con la nuova definizione di "lock" del PdC (post
-        # Sessione 12+): qualsiasi scrittura non-cancellata blocca il
-        # cambio di setup contabile.
+        # Conta scritture in QUALSIASI stato (draft/posted/cancel).
+        # Anche le scritture annullate (state='cancel') referenziano
+        # i conti del PdC tramite move.line, e impedirebbero un
+        # uninstall pulito futuro.
         move_count = self.env['account.move'].sudo().search_count([
             ('company_id', '=', company.id),
-            ('state', 'in', ('draft', 'posted')),
         ])
         if move_count > 0:
             raise UserError(_(
                 "L'azienda %(company)s ha già %(count)d scritture contabili "
-                "(in bozza o confermate). Il PdC OdooManager può essere "
-                "attivato solo su aziende vergini."
+                "(in qualunque stato: bozza, confermate o annullate). "
+                "Il PdC OdooManager può essere attivato solo su aziende "
+                "completamente vergini."
             ) % {'company': company.name, 'count': move_count})
         if company.l10n_it_pdcodm_enabled:
             raise UserError(_(

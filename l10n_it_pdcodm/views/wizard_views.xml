@@ -138,9 +138,12 @@
                         </div>
 
                         <group string="Stato corrente">
-                            <field name="move_count" readonly="1"/>
-                            <field name="account_count" readonly="1"/>
-                            <field name="journal_count" readonly="1"/>
+                            <field name="move_count" readonly="1"
+                                   help="Scritture contabili sulla company (in qualunque stato: bozza, confermate o annullate). Devono essere zero per procedere."/>
+                            <field name="account_count" readonly="1"
+                                   help="Conti del PdC OdooManager (origin='standard') caricati su questa company. Saranno rimossi tutti, sostituiti dai conti l10n_it standard."/>
+                            <field name="journal_count" readonly="1"
+                                   help="Tutti i giornali contabili della company. Include sia i 6 italiani standard creati dal setup wizard (VEND/ACQ/CASSA/BANCA/OPVAR/APCHI) sia i 6-7 default creati dal try_loading di Odoo (INV/BILL/CSH1/BNK1/MISC/EXCH/CABA). Verranno tutti rimossi; il try_loading('it') successivo ricreerà i journals standard del PdC l10n_it."/>
                         </group>
 
                         <div class="alert alert-danger" role="alert"
@@ -149,8 +152,8 @@
                                 <strong>Disinstallazione NON permessa</strong>:
                                 la company ha <field name="move_count" nolabel="1"
                                                      readonly="1" class="oe_inline"/>
-                                scritture contabili. Per cambiare PdC, crea
-                                una nuova azienda.
+                                scritture contabili (in qualunque stato).
+                                Eliminale o crea una nuova azienda.
                             </p>
                         </div>
                     </div>

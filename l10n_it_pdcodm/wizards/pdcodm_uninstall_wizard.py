@@ -61,18 +61,17 @@ class PdcodmUninstallWizard(models.TransientModel):
 
     @api.depends('company_id')
     def _compute_move_count(self):
-        # Contiamo TUTTE le scritture rilevanti (draft + posted),
-        # escludendo solo gli annullati (state='cancel').
-        # Anche le bozze bloccano la disinstallazione: l'unlink dei
-        # conti standard del PdC fallirebbe per Foreign Key constraint
-        # se ci sono account.move.line draft che li referenziano,
-        # producendo 2121 conti orfani con fallback `deprecated=True`.
-        # Più pulito costringere l'utente a fare prima pulizia (cancel
-        # o unlink di tutte le scritture su conti OdM).
+        # Contiamo TUTTE le scritture esistenti sulla company,
+        # indipendentemente dallo state (draft, posted, cancel).
+        # Anche le scritture annullate (state='cancel') contengono
+        # account.move.line che referenziano i conti del PdC: senza
+        # il loro unlink, le FK constraint impediscono di eliminare
+        # i conti del PdC, lasciando 2121 conti orfani come fallback
+        # `deprecated=True`. Per pulizia totale, blocchiamo finché
+        # NON esiste alcuna scrittura sulla company (qualsiasi state).
         for w in self:
             w.move_count = self.env['account.move'].sudo().search_count([
                 ('company_id', '=', w.company_id.id),
-                ('state', 'in', ('draft', 'posted')),
             ])
 
     @api.depends('company_id')
@@ -128,14 +127,14 @@ class PdcodmUninstallWizard(models.TransientModel):
             raise UserError(_(
                 "Impossibile disinstallare il PdC OdooManager "
                 "sull'azienda %(company)s.\n\n"
-                "Sono presenti %(count)d scritture contabili (in bozza o "
-                "confermate) sulla company.\n\n"
-                "Anche le bozze bloccano: i conti del PdC OdooManager "
-                "non possono essere eliminati finché esistono righe di "
-                "scrittura (anche draft) che li referenziano.\n\n"
+                "Sono presenti %(count)d scritture contabili sulla company "
+                "(in qualunque stato: bozza, confermate o annullate).\n\n"
+                "Tutte le scritture (incluse le annullate) referenziano "
+                "i conti del PdC OdooManager. La loro presenza impedisce "
+                "l'eliminazione pulita dei conti.\n\n"
                 "Cosa fare:\n"
                 "  • Per scritture confermate: riportarle a bozza, poi eliminarle.\n"
-                "  • Per scritture in bozza: eliminarle direttamente.\n"
+                "  • Per scritture in bozza o annullate: eliminarle direttamente.\n"
                 "  • Se la contabilità è già operativa, NON cancellare le "
                 "scritture — crea invece una nuova azienda con il PdC che preferisci."
             ) % {'company': company.name, 'count': self.move_count})

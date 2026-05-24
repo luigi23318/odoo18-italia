@@ -111,9 +111,11 @@ class ResCompany(models.Model):
                 company.l10n_it_pdcodm_locked = False
                 company.l10n_it_pdcodm_locked_date = False
                 continue
+            # Count su QUALSIASI stato (draft/posted/cancel): anche le
+            # cancellate hanno move.line che referenziano i conti del
+            # PdC, impedendone l'eliminazione pulita all'uninstall.
             move_count = self.env['account.move'].sudo().search_count([
                 ('company_id', '=', company.id),
-                ('state', 'in', ('draft', 'posted')),
             ])
             was_locked = company.l10n_it_pdcodm_locked
             new_locked = move_count > 0
@@ -242,14 +244,12 @@ class ResCompany(models.Model):
                         ) % {'company': company.name, 'count': move_count})
                 elif not new_value and company.l10n_it_pdcodm_enabled:
                     # Transizione True → False: blocca se ci sono scritture
-                    # (in bozza o confermate, esclusi gli annullati) che
-                    # usano conti origin='standard' del PdC OdooManager.
-                    # Le bozze contano: il successivo unlink dei conti
-                    # del PdC fallirebbe per Foreign Key se ci sono
-                    # account.move.line draft che li referenziano.
+                    # di QUALSIASI stato (draft/posted/cancel) che usano
+                    # conti origin='standard' del PdC OdooManager. Anche
+                    # le cancellate hanno move.line referenzianti che
+                    # impediscono l'unlink pulito dei conti.
                     move_count = self.env['account.move'].sudo().search_count([
                         ('company_id', '=', company.id),
-                        ('state', 'in', ('draft', 'posted')),
                         ('line_ids.account_id.l10n_it_pdcodm_origin', '=', 'standard'),
                     ])
                     if move_count > 0:
