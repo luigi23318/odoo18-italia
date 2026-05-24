@@ -237,12 +237,14 @@ class ResCompany(models.Model):
                         ) % {'company': company.name, 'count': move_count})
                 elif not new_value and company.l10n_it_pdcodm_enabled:
                     # Transizione True → False: blocca se ci sono scritture
-                    # CONFERMATE (state='posted') su conti origin='standard'.
-                    # Le bozze NON bloccano: l'utente può annullarle/eliminarle
-                    # prima di disattivare il PdC.
+                    # (in bozza o confermate, esclusi gli annullati) che
+                    # usano conti origin='standard' del PdC OdooManager.
+                    # Le bozze contano: il successivo unlink dei conti
+                    # del PdC fallirebbe per Foreign Key se ci sono
+                    # account.move.line draft che li referenziano.
                     move_count = self.env['account.move'].sudo().search_count([
                         ('company_id', '=', company.id),
-                        ('state', '=', 'posted'),
+                        ('state', 'in', ('draft', 'posted')),
                         ('line_ids.account_id.l10n_it_pdcodm_origin', '=', 'standard'),
                     ])
                     if move_count > 0:

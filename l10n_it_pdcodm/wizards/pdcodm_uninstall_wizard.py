@@ -61,13 +61,18 @@ class PdcodmUninstallWizard(models.TransientModel):
 
     @api.depends('company_id')
     def _compute_move_count(self):
-        # Contiamo SOLO le scritture confermate (state='posted'):
-        # le bozze NON bloccano la disinstallazione, perché l'utente
-        # può cancellarle prima del setup change.
+        # Contiamo TUTTE le scritture rilevanti (draft + posted),
+        # escludendo solo gli annullati (state='cancel').
+        # Anche le bozze bloccano la disinstallazione: l'unlink dei
+        # conti standard del PdC fallirebbe per Foreign Key constraint
+        # se ci sono account.move.line draft che li referenziano,
+        # producendo 2121 conti orfani con fallback `deprecated=True`.
+        # Più pulito costringere l'utente a fare prima pulizia (cancel
+        # o unlink di tutte le scritture su conti OdM).
         for w in self:
             w.move_count = self.env['account.move'].sudo().search_count([
                 ('company_id', '=', w.company_id.id),
-                ('state', '=', 'posted'),
+                ('state', 'in', ('draft', 'posted')),
             ])
 
     @api.depends('company_id')
@@ -124,9 +129,15 @@ class PdcodmUninstallWizard(models.TransientModel):
                 "Impossibile disinstallare il PdC OdooManager "
                 "sull'azienda %(company)s.\n\n"
                 "Sono presenti %(count)d scritture contabili (in bozza o "
-                "confermate). Una volta avviata la contabilità, il PdC "
-                "non è più modificabile (SPEC 5.3).\n\n"
-                "Per migrare a un altro PdC, crea una nuova azienda."
+                "confermate) sulla company.\n\n"
+                "Anche le bozze bloccano: i conti del PdC OdooManager "
+                "non possono essere eliminati finché esistono righe di "
+                "scrittura (anche draft) che li referenziano.\n\n"
+                "Cosa fare:\n"
+                "  • Per scritture confermate: riportarle a bozza, poi eliminarle.\n"
+                "  • Per scritture in bozza: eliminarle direttamente.\n"
+                "  • Se la contabilità è già operativa, NON cancellare le "
+                "scritture — crea invece una nuova azienda con il PdC che preferisci."
             ) % {'company': company.name, 'count': self.move_count})
 
         if not company.l10n_it_pdcodm_enabled:

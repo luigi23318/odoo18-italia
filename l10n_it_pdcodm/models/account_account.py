@@ -185,10 +185,22 @@ class AccountAccount(models.Model):
         deprecati con `deprecated=True`, non eliminati), e di conti
         origin='user' usati in scritture (vanno deprecati).
 
-        Bypass: `self.env.context.get('l10n_it_pdcodm_force_unlink')`
-        (usato dal wizard di disinstallazione PdC — Sessione 7).
+        Bypass riconosciuti:
+        - `context['l10n_it_pdcodm_force_unlink']` → usato dal wizard
+          di disinstallazione PdC (Sessione 7), bypass voluto.
+        - `context['_force_unlink']` (Odoo `MODULE_UNINSTALL_FLAG`) →
+          usato da Odoo stesso durante il cleanup di chart_template
+          al `try_loading()` di un template diverso, e durante la
+          disinstallazione di un modulo. Non possiamo bloccarlo,
+          altrimenti rompiamo il flusso `try_loading('it_pdcodm', ...)`
+          su company che ha già `chart_template='it_pdcodm'` da un
+          setup precedente.
         """
         if self.env.context.get('l10n_it_pdcodm_force_unlink'):
+            return super().unlink()
+        if self.env.context.get('_force_unlink'):
+            # Odoo MODULE_UNINSTALL_FLAG → cleanup tecnico chart_template
+            # o disinstallazione modulo. Lascia passare.
             return super().unlink()
 
         for account in self:
