@@ -196,7 +196,13 @@ class PdcodmUninstallWizard(models.TransientModel):
         # Questo riassegna property esterne (product.category, ecc.) al
         # nuovo template, liberando i conti OdooManager dai riferimenti.
         # Reset chart_template per permettere try_loading senza conflitti.
-        company.sudo().write({'chart_template': False})
+        # NB: setto SIMULTANEAMENTE enabled=False per non triggerare il
+        # controllo E (_check_pdcodm_required_chart_template) durante lo
+        # stato intermedio "enabled=True + chart_template=False".
+        company.sudo().write({
+            'chart_template': False,
+            'l10n_it_pdcodm_enabled': False,
+        })
         ChartTemplate = self.env['account.chart.template']
         l10n_it_loaded = False
         try:

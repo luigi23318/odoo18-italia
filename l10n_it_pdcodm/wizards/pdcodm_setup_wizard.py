@@ -198,6 +198,33 @@ class PdcodmSetupWizard(models.TransientModel):
                 "Il PdC OdooManager è già attivo sull'azienda %(company)s."
             ) % {'company': company.name})
 
+        # Check defensivo: verifica residui orfani del PdC OdooManager.
+        # Può capitare se lo stato della company è stato modificato
+        # manualmente (via shell, SQL, developer mode) senza usare i
+        # wizard, lasciando i conti origin='standard' senza il flag
+        # `enabled`. In tal caso, il setup non si può ri-eseguire
+        # finché i conti non vengono puliti.
+        existing_pdcodm_accounts = self.env['account.account'].sudo().search_count([
+            ('company_ids', 'in', company.id),
+            ('l10n_it_pdcodm_origin', '=', 'standard'),
+        ])
+        if existing_pdcodm_accounts > 0:
+            raise UserError(_(
+                "L'azienda %(company)s ha già %(count)d conti del PdC "
+                "OdooManager caricati (origin='standard') ma il flag "
+                "'Usa PdC OdooManager' è disattivo.\n\n"
+                "Lo stato è incoerente — è successo qualcosa di anomalo "
+                "(es. modifica diretta via shell/SQL/developer mode).\n\n"
+                "Per ripristinare uno stato coerente:\n"
+                "  • Se intendi MANTENERE il PdC OdooManager: usa "
+                "`odoo shell` per riallineare il flag a True, oppure "
+                "modifica res.company.l10n_it_pdcodm_enabled via "
+                "developer mode.\n"
+                "  • Se intendi RIMUOVERE il PdC: imposta temporaneamente "
+                "il flag a True via shell, poi lancia il wizard di "
+                "disinstallazione che farà la pulizia completa."
+            ) % {'company': company.name, 'count': existing_pdcodm_accounts})
+
         _logger.info(
             "PdC OdooManager: avvio setup su company '%s' (id=%s), regime=%s, "
             "include_storico=%s, strict_mode=%s, create_journals=%s",
