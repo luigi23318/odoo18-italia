@@ -1,5 +1,6 @@
 # Part of l10n_it_pdcodm. See LICENSE file for full copyright and licensing details.
 import logging
+import re
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -255,23 +256,74 @@ class PdcodmSetupWizard(models.TransientModel):
         # _deprecate_incompatible_accounts usa .sudo() internamente
         deprecated_count = self._deprecate_incompatible_accounts(company)
 
+        # (4b) Deprecazione conti l10n_it residui (4 cifre).
+        # `try_loading('it_pdcodm')` NON rimuove i 188 conti l10n_it
+        # eventualmente già presenti (es. company creata con setup
+        # contabilità Odoo). Per evitare che l'utente veda 2321 conti
+        # nel menu "Conti contabili" (2121 PdC OdM + 188 l10n_it +
+        # tecnici), li deprechiamo: restano nel DB per integrità
+        # storica ma sono nascosti dal default filter "deprecated=False"
+        # e non utilizzabili in nuove scritture.
+        l10n_it_deprecated_count = self._deprecate_l10n_it_residual_accounts(company)
+
         # (5) Giornali standard italiani
         # _create_italian_journals usa .sudo().with_company(company) internamente
         journals_created = 0
+        journals_created_detail = []
         if self.create_journals:
-            journals_created = self._create_italian_journals(company)
+            journals_created, journals_created_detail = self._create_italian_journals(company)
+
+        # (5b) Archiviazione giornali residui (es. l10n_it standard).
+        # Stesso problema dei conti l10n_it residui (vedi 4b): se la
+        # company aveva già giornali da setup contabilità Odoo o da
+        # un l10n_it caricato in precedenza (codici INV, BILL, BNK1,
+        # CSH1, MISC, EXCH, CABA), questi coesisterebbero con i 6 OdM
+        # confondendo l'utente che potrebbe registrare scritture sul
+        # giornale "sbagliato".
+        # Strategy: active=False su tutto ciò che NON è del PdC OdM.
+        # I record restano nel DB (integrità storica) ma spariscono dal
+        # filtro default e non sono selezionabili in nuove scritture.
+        # NB: si esegue solo se create_journals=True (l'utente vuole il
+        # set OdM come default); altrimenti rispettiamo i giornali
+        # pre-esistenti dell'utente.
+        journals_archived = 0
+        journals_archived_detail = []
+        if self.create_journals:
+            journals_archived, journals_archived_detail = (
+                self._archive_l10n_it_residual_journals(company)
+            )
 
         # (6) Riassunto + transizione
         summary_lines = [
             _("PdC OdooManager caricato sull'azienda %s.") % company.name,
             _("Regime: %s") % dict(self._fields['regime'].selection).get(self.regime),
             _("Conti deprecati (incompatibili col regime): %d") % deprecated_count,
-            _("Giornali italiani creati: %d") % journals_created,
+            _("Conti l10n_it residui deprecati: %d") % l10n_it_deprecated_count,
             _("Strict mode: %s") % (self.strict_mode and _("attivo") or _("disattivo")),
+            "",
+            _("Giornali italiani configurati: %d") % journals_created,
         ]
+        for jd in journals_created_detail:
+            marker = _(" — riusato") if jd.get('reused') else ""
+            summary_lines.append(
+                _("  • [%(code)s] %(name)s (%(type)s)") % jd + marker
+            )
+        if journals_archived:
+            summary_lines.append("")
+            summary_lines.append(
+                _("Giornali pre-esistenti archiviati: %d") % journals_archived
+            )
+            for jd in journals_archived_detail:
+                summary_lines.append(_("  • [%(code)s] %(name)s (%(type)s)") % jd)
         self.result_summary = '\n'.join(summary_lines)
         self.state = 'done'
-        _logger.info("PdC OdooManager: setup completato su company '%s'.", company.name)
+        _logger.info(
+            "PdC OdooManager: setup completato su company '%s'. "
+            "Deprecati regime=%d, l10n_it residui=%d, giornali creati=%d, "
+            "giornali archiviati=%d.",
+            company.name, deprecated_count, l10n_it_deprecated_count,
+            journals_created, journals_archived,
+        )
         return self._reopen_self()
 
     def _deprecate_incompatible_accounts(self, company):
@@ -305,28 +357,187 @@ class PdcodmSetupWizard(models.TransientModel):
             to_deprecate.write({'deprecated': True})
         return len(to_deprecate)
 
+    def _deprecate_l10n_it_residual_accounts(self, company):
+        """Marca `deprecated=True` i conti `l10n_it` standard residui
+        sulla company.
+
+        Contesto: quando si installa il PdC OdooManager su una company
+        che ha già caricato il PdC `l10n_it` standard (188 conti
+        italiani Odoo), `try_loading('it_pdcodm')` NON rimuove i conti
+        precedenti — li lascia attivi accanto ai 2121 di OdooManager.
+
+        Risultato indesiderato: nel menu "Conti contabili" l'utente
+        vede 2321 conti (2121 OdM + 188 l10n_it + tecnici), e potrebbe
+        registrare scritture sui conti l10n_it residui, generando
+        incoerenze contabili.
+
+        Soluzione: deprecare i 188 conti l10n_it (deprecated=True).
+        Restano nel DB per integrità storica ma sono nascosti dal
+        filtro default e non selezionabili in nuove scritture.
+
+        Identificazione dei conti l10n_it:
+        - `l10n_it_pdcodm_origin = 'external'` (creati da template
+          esterno, non da OdooManager).
+        - Codice a 4 cifre (es. 1101, 1106, 7100). I conti OdooManager
+          hanno SEMPRE codice a 6 cifre (XYYZZZ), così come i conti
+          tecnici Odoo. → il pattern `^\d{4}$` isola in modo univoco
+          i residui di l10n_it.
+
+        Ritorna il numero di conti deprecati.
+        """
+        code_re = re.compile(r'^\d{4}$')
+        accounts = self.env['account.account'].sudo().search([
+            ('company_ids', 'in', company.id),
+            ('l10n_it_pdcodm_origin', '=', 'external'),
+            ('deprecated', '=', False),
+        ])
+        to_deprecate = self.env['account.account'].sudo()
+        for acc in accounts:
+            # `code` è company_dependent: leggere sempre con
+            # `with_company(company)` per ottenere il codice corretto.
+            code = acc.with_company(company).code or ''
+            if code_re.match(code):
+                to_deprecate |= acc
+        if to_deprecate:
+            to_deprecate.write({'deprecated': True})
+            _logger.info(
+                "PdC OdooManager: deprecati %d conti l10n_it residui "
+                "sulla company '%s'.", len(to_deprecate), company.name,
+            )
+        return len(to_deprecate)
+
     def _create_italian_journals(self, company):
-        """Crea 6 giornali contabili italiani standard (SPEC 7.1)."""
+        """Crea (o riusa) 6 giornali contabili italiani standard
+        (SPEC 7.1).
+
+        Strategia "own the code": il wizard PdC OdM possiede i 6
+        codici `VEND`, `ACQ`, `CASSA`, `BANCA`, `OPVAR`, `APCHI`. Se
+        esiste già un giornale con uno di questi codici sulla company
+        (es. perché `try_loading('it')` precedente ha tradotto
+        `BILL` → `ACQ` in italiano), lo **riusiamo** sovrascrivendo
+        nome/tipo/active. Questo evita due bug:
+
+        (a) Errore di vincolo univoco `(code, company_id)` se
+            facessimo `create()` ignaramente.
+        (b) Giornale l10n_it residuo che "tiene il posto" del nostro
+            (con nome "Fatture Fornitori" tradotto da Odoo invece del
+            nostro "Fatture fornitori" — apparentemente uguali ma con
+            tipo/configurazione potenzialmente diversa).
+
+        Ritorna una tupla `(count, detail)` dove `count` è il totale
+        di giornali creati+riusati e `detail` la lista con `code`,
+        `name`, `type` e flag `reused` (per il summary).
+        """
         Journal = self.env['account.journal'].sudo().with_company(company)
         journals_data = [
-            {'name': "Fatture clienti", 'code': 'VEND', 'type': 'sale'},
-            {'name': "Fatture fornitori", 'code': 'ACQ', 'type': 'purchase'},
-            {'name': "Cassa", 'code': 'CASSA', 'type': 'cash'},
-            {'name': "Banca", 'code': 'BANCA', 'type': 'bank'},
-            {'name': "Operazioni varie", 'code': 'OPVAR', 'type': 'general'},
-            {'name': "Apertura/Chiusura", 'code': 'APCHI', 'type': 'general'},
+            {'name': _("Fatture clienti"), 'code': 'VEND', 'type': 'sale'},
+            {'name': _("Fatture fornitori"), 'code': 'ACQ', 'type': 'purchase'},
+            {'name': _("Cassa"), 'code': 'CASSA', 'type': 'cash'},
+            {'name': _("Banca"), 'code': 'BANCA', 'type': 'bank'},
+            {'name': _("Operazioni varie"), 'code': 'OPVAR', 'type': 'general'},
+            {'name': _("Apertura/Chiusura"), 'code': 'APCHI', 'type': 'general'},
         ]
-        created = 0
+        type_labels = {
+            'sale': _("vendite"),
+            'purchase': _("acquisti"),
+            'cash': _("cassa"),
+            'bank': _("banca"),
+            'general': _("operazioni varie"),
+        }
+        count = 0
+        detail = []
         for jd in journals_data:
-            existing = Journal.search([
+            # active_test=False: se un giornale con lo stesso codice è
+            # archiviato (es. da un setup precedente), va riusato
+            # anche lui — non possiamo creare un duplicato per il
+            # vincolo univoco (code, company_id).
+            existing = Journal.with_context(active_test=False).search([
                 ('code', '=', jd['code']),
                 ('company_id', '=', company.id),
             ], limit=1)
+            reused = False
             if existing:
-                continue
-            Journal.create(dict(jd, company_id=company.id))
-            created += 1
-        return created
+                # Riusiamo: sovrascriviamo nome, tipo (per allineare
+                # alle convenzioni OdM) e riattiviamo se archiviato.
+                # NB: `type` può causare problemi se esistono già
+                # scritture sul giornale, ma siamo su company vergine
+                # (precondizione del setup → zero scritture).
+                existing.write({
+                    'name': jd['name'],
+                    'type': jd['type'],
+                    'active': True,
+                })
+                reused = True
+            else:
+                Journal.create(dict(jd, company_id=company.id))
+            detail.append({
+                'code': jd['code'],
+                'name': jd['name'],
+                'type': type_labels.get(jd['type'], jd['type']),
+                'reused': reused,
+            })
+            count += 1
+        return count, detail
+
+    # Codici dei 6 giornali creati dal PdC OdM (vedi
+    # `_create_italian_journals`). Definito a livello di classe perché
+    # serve anche a `_archive_l10n_it_residual_journals` per evitare
+    # di auto-archiviarsi.
+    _PDCODM_JOURNAL_CODES = frozenset(('VEND', 'ACQ', 'CASSA', 'BANCA', 'OPVAR', 'APCHI'))
+
+    def _archive_l10n_it_residual_journals(self, company):
+        """Archivia (`active=False`) i giornali della company che NON
+        appartengono al set PdC OdM.
+
+        Contesto: in Odoo 18 una company "vergine" creata via setup
+        contabilità ha già dei giornali default (INV, BILL, BNK1, CSH1,
+        MISC, EXCH, CABA — circa 7 dal template l10n_it). Il wizard
+        PdC OdM crea i suoi 6 giornali italiani (VEND, ACQ, CASSA,
+        BANCA, OPVAR, APCHI) con codici DIVERSI: l'`existing` check in
+        `_create_italian_journals` (per `code`) non trova match e i
+        due set coesistono — 13 giornali totali.
+
+        Risultato indesiderato: nel dropdown "Giornale" l'utente vede
+        sia `INV` sia `VEND` per le fatture clienti, sia `BNK1` sia
+        `BANCA` per la banca, ecc. — scritture spalmate su giornali
+        diversi senza criterio.
+
+        Soluzione: `active=False` su tutto ciò che non è del PdC OdM.
+        I record restano nel DB (integrità storica per eventuali
+        scritture pre-esistenti, anche se sul flusso vergine non ce ne
+        sono) ma spariscono dal filtro default e non sono selezionabili
+        in nuove scritture.
+
+        Ritorna `(count, detail)` analogo a `_create_italian_journals`.
+        """
+        type_labels = {
+            'sale': _("vendite"),
+            'purchase': _("acquisti"),
+            'cash': _("cassa"),
+            'bank': _("banca"),
+            'general': _("operazioni varie"),
+        }
+        # active=True implicito (search default): vogliamo archiviare
+        # solo i giornali ATTUALMENTE attivi — quelli già inattivi
+        # restano tali.
+        journals = self.env['account.journal'].sudo().search([
+            ('company_id', '=', company.id),
+            ('code', 'not in', list(self._PDCODM_JOURNAL_CODES)),
+        ])
+        if not journals:
+            return 0, []
+        detail = [{
+            'code': j.code,
+            'name': j.name,
+            'type': type_labels.get(j.type, j.type),
+        } for j in journals]
+        journals.write({'active': False})
+        _logger.info(
+            "PdC OdooManager: archiviati %d giornali residui sulla company "
+            "'%s' (codici: %s).",
+            len(journals), company.name, ', '.join(j.code for j in journals),
+        )
+        return len(journals), detail
 
     def action_close(self):
         """Chiude il wizard a setup completato."""

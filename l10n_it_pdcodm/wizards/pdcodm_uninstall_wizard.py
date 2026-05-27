@@ -84,8 +84,14 @@ class PdcodmUninstallWizard(models.TransientModel):
 
     @api.depends('company_id')
     def _compute_journal_count(self):
+        # active_test=False per includere anche i giornali archiviati
+        # dal setup wizard (es. l10n_it residui disattivati con
+        # `active=False`). In fase di uninstall vogliamo rimuovere
+        # TUTTI i giornali della company, non solo quelli attivi.
         for w in self:
-            w.journal_count = self.env['account.journal'].sudo().search_count([
+            w.journal_count = self.env['account.journal'].sudo().with_context(
+                active_test=False,
+            ).search_count([
                 ('company_id', '=', w.company_id.id),
             ])
 
@@ -175,10 +181,29 @@ class PdcodmUninstallWizard(models.TransientModel):
         if reset_vals:
             company.sudo().write(reset_vals)
 
-        # (3) Unlink dei giornali della company
-        journals = self.env['account.journal'].sudo().search([
+        # (3) Unlink dei giornali della company.
+        # active_test=False per includere anche i giornali archiviati
+        # dal setup wizard (es. l10n_it residui disattivati). Devono
+        # essere rimossi anche loro per lasciare la company pulita.
+        journals = self.env['account.journal'].sudo().with_context(
+            active_test=False,
+        ).search([
             ('company_id', '=', company.id),
         ])
+        # Snapshot dettagliato PRIMA dell'unlink (dopo, i record sono
+        # eliminati e non leggibili). Serve per il summary finale.
+        journal_type_labels = {
+            'sale': _("vendite"),
+            'purchase': _("acquisti"),
+            'cash': _("cassa"),
+            'bank': _("banca"),
+            'general': _("operazioni varie"),
+        }
+        journals_removed_detail = [{
+            'code': j.code,
+            'name': j.name,
+            'type': journal_type_labels.get(j.type, j.type),
+        } for j in journals]
         journals_removed = len(journals)
         if journals:
             try:
@@ -190,6 +215,7 @@ class PdcodmUninstallWizard(models.TransientModel):
                     len(journals), company.name, e,
                 )
                 journals_removed = 0
+                journals_removed_detail = []
 
         # (4) try_loading('it') PRIMA dell'unlink dei conti
         # Questo riassegna property esterne (product.category, ecc.) al
@@ -204,9 +230,21 @@ class PdcodmUninstallWizard(models.TransientModel):
         })
         ChartTemplate = self.env['account.chart.template']
         l10n_it_loaded = False
+        l10n_it_journals_detail = []
         try:
             ChartTemplate.try_loading('it', company, install_demo=False)
             l10n_it_loaded = True
+            # Cattura i giornali ricreati dal template l10n_it per
+            # mostrarli nel summary (in genere 7: vendite, acquisti,
+            # cassa, banca, generale, fatture vendite, fatture acquisti).
+            recreated = self.env['account.journal'].sudo().search([
+                ('company_id', '=', company.id),
+            ])
+            l10n_it_journals_detail = [{
+                'code': j.code,
+                'name': j.name,
+                'type': journal_type_labels.get(j.type, j.type),
+            } for j in recreated]
         except Exception as e:
             _logger.error(
                 "PdC OdooManager: impossibile caricare l10n_it standard "
@@ -250,11 +288,23 @@ class PdcodmUninstallWizard(models.TransientModel):
         summary_lines = [
             _("PdC OdooManager disinstallato dall'azienda %s.") % company.name,
             _("Conti standard rimossi: %d") % accounts_removed,
+            "",
             _("Giornali rimossi: %d") % journals_removed,
         ]
+        for jd in journals_removed_detail:
+            summary_lines.append(_("  • [%(code)s] %(name)s (%(type)s)") % jd)
+
         if l10n_it_loaded:
+            summary_lines.append("")
             summary_lines.append(_("PdC `l10n_it` standard caricato con successo."))
+            if l10n_it_journals_detail:
+                summary_lines.append(
+                    _("Giornali ricreati dal PdC l10n_it: %d") % len(l10n_it_journals_detail)
+                )
+                for jd in l10n_it_journals_detail:
+                    summary_lines.append(_("  • [%(code)s] %(name)s (%(type)s)") % jd)
         else:
+            summary_lines.append("")
             summary_lines.append(_("ATTENZIONE: caricamento PdC `l10n_it` fallito (vedi log)."))
 
         self.result_summary = '\n'.join(summary_lines)
