@@ -213,7 +213,19 @@ class AccountMove(models.Model):
     # ══════════════════════════════════════════════════════════════════
 
     def _l10n_it_edi_generate_filename(self):
-        """Override: usa la Partita IVA nel filename se configurato nelle impostazioni PEC."""
+        """Override:
+        - Se è presente un file firmato (.p7m), restituisce il nome derivato da quello
+          SENZA consumare un nuovo progressivo (il progressivo è già stato consumato
+          quando l'XML è stato generato per la firma).
+        - Altrimenti, usa la Partita IVA nel filename se configurato nelle impostazioni PEC.
+        """
+        # Se c'è un file firmato, riusa il suo nome base (no nuovo progressivo)
+        if self.l10n_it_pec_signed_attachment_id:
+            base_name = self.l10n_it_pec_signed_attachment_id.name
+            if base_name.lower().endswith('.p7m'):
+                base_name = base_name[:-4]
+            return base_name
+
         company = self.company_id._l10n_it_get_edi_company()
         if company.l10n_it_pec_filename_id_type == 'partita_iva':
             a = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -352,21 +364,10 @@ class AccountMove(models.Model):
             filename = attachment.get('name', '')
             xml_content = attachment.get('raw', b'')
 
-            # Firma digitale PA: stessa logica di _l10n_it_edi_upload
-            if move._l10n_it_pec_is_pa_invoice() and move.l10n_it_pec_signed_attachment_id:
+            # Firma digitale: usa il file firmato se presente
+            if move.l10n_it_pec_signed_attachment_id:
                 signed_att = move.l10n_it_pec_signed_attachment_id
                 send_filename = signed_att.name
-            elif move._l10n_it_pec_is_pa_invoice() and not move.l10n_it_pec_signed_attachment_id:
-                error_message = _(
-                    "Le fatture verso la PA richiedono la firma digitale. "
-                    "Scaricare l'XML, firmarlo e ricaricare il file firmato."
-                )
-                move.l10n_it_edi_header = error_message
-                move.sudo().message_post(body=error_message)
-                results[filename] = {
-                    'error_message': error_message,
-                }
-                continue
             else:
                 send_filename = filename
 
@@ -412,24 +413,15 @@ class AccountMove(models.Model):
         for file_data in (files or []):
             filename = file_data['filename']
 
-            # Firma digitale PA: sostituisci contenuto con file firmato
+            # Firma digitale: se è presente un file firmato, sostituisci il contenuto.
             # Il filename originale è preservato come chiave nel dict dei risultati
             # perché il chiamante _l10n_it_edi_send() lo usa per il lookup.
-            if self._l10n_it_pec_is_pa_invoice() and self.l10n_it_pec_signed_attachment_id:
+            if self.l10n_it_pec_signed_attachment_id:
                 signed_att = self.l10n_it_pec_signed_attachment_id
                 file_data = dict(file_data,
                     filename=signed_att.name,
                     xml=signed_att.datas,
                 )
-            elif self._l10n_it_pec_is_pa_invoice() and not self.l10n_it_pec_signed_attachment_id:
-                results[filename] = {
-                    'error': _("Firma digitale richiesta"),
-                    'error_description': _(
-                        "Le fatture verso la PA richiedono la firma digitale. "
-                        "Scaricare l'XML, firmarlo e ricaricare il file firmato."
-                    ),
-                }
-                continue
 
             try:
                 self._l10n_it_pec_send_to_sdi(file_data)
@@ -578,36 +570,13 @@ class AccountMove(models.Model):
             self.l10n_it_edi_header = Markup('<br/>').join(messages)
             return {'type': 'ir.actions.client', 'tag': 'reload'}
 
-        # Prepara attachment_vals SENZA consumare nuovo progressivo se c'è già un file firmato.
-        # _l10n_it_edi_get_attachment_values internamente chiama _l10n_it_edi_generate_filename
-        # che incrementa la sequenza: dobbiamo evitarlo quando è già stato firmato un file
-        # con un progressivo già consumato.
-        if self.l10n_it_pec_signed_attachment_id:
-            # Ricava il nome base dal file firmato (rimuovi .p7m)
-            signed_att = self.l10n_it_pec_signed_attachment_id
-            base_name = signed_att.name
-            if base_name.lower().endswith('.p7m'):
-                base_name = base_name[:-4]
-            # Genera XML al volo senza progressivo (verrà comunque sostituito dal p7m all'invio)
-            xml_content = self._l10n_it_edi_render_xml()
-            # Salva nel campo binario standard (Odoo crea l'ir.attachment automaticamente)
-            self.l10n_it_edi_attachment_file = base64.b64encode(xml_content)
-            # Rinomina l'attachment generato per usare il nome base del p7m
-            self.invalidate_recordset(fnames=['l10n_it_edi_attachment_id', 'l10n_it_edi_attachment_file'])
-            if self.l10n_it_edi_attachment_id:
-                self.l10n_it_edi_attachment_id.name = base_name
-            attachment_vals = {
-                'name': base_name,
-                'raw': xml_content,
-                'res_model': 'account.move',
-                'res_id': self.id,
-                'mimetype': 'application/xml',
-            }
-        else:
-            # Nessun file firmato: usa il flusso standard (consuma progressivo)
-            attachment_vals = self._l10n_it_edi_get_attachment_values(pdf_values=None)
-            self.env['ir.attachment'].create(attachment_vals)
-            self.invalidate_recordset(fnames=['l10n_it_edi_attachment_id', 'l10n_it_edi_attachment_file'])
+        # Crea attachment standard EDI (identico al flusso standard action_l10n_it_edi_send).
+        # _l10n_it_edi_get_attachment_values → _l10n_it_edi_generate_filename:
+        # se c'è un file firmato, l'override restituisce il nome del p7m senza
+        # consumare un nuovo progressivo (allineamento garantito tra XML e p7m).
+        attachment_vals = self._l10n_it_edi_get_attachment_values(pdf_values=None)
+        self.env['ir.attachment'].create(attachment_vals)
+        self.invalidate_recordset(fnames=['l10n_it_edi_attachment_id', 'l10n_it_edi_attachment_file'])
         self.message_post(attachment_ids=self.l10n_it_edi_attachment_id.ids)
 
         # Invio via flusso standard → _l10n_it_edi_upload → PEC
