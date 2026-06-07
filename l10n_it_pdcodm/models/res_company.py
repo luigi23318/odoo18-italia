@@ -161,11 +161,20 @@ class ResCompany(models.Model):
                 raise ValidationError(_(
                     "L'azienda %(company)s ha il PdC OdooManager attivo "
                     "ma non ha alcun chart template impostato.\n\n"
-                    "Lo stato è incoerente. Lancia il wizard \"Configura "
-                    "PdC OdooManager\" per ricaricare i conti, oppure "
-                    "(per recovery) usa `odoo shell` per resettare lo "
-                    "stato manualmente."
-                ) % {'company': company.name})
+                    "Lo stato è incoerente: tipicamente il caricamento del "
+                    "piano dei conti è stato interrotto (es. riavvio del "
+                    "server o del container durante il setup).\n\n"
+                    "Il wizard \"Configura PdC OdooManager\" da solo NON "
+                    "basta: si rifiuterebbe perché il flag risulta già "
+                    "attivo. Recovery via `odoo shell`:\n"
+                    "  company = env['res.company'].browse(%(company_id)d)\n"
+                    "  company.l10n_it_pdcodm_enabled = False\n"
+                    "  env.cr.commit()\n"
+                    "Poi rilancia \"Configura PdC OdooManager\" dalla UI: "
+                    "ripartirà da uno stato pulito.\n"
+                    "(Se restano conti del PdC caricati a metà, il wizard "
+                    "lo segnalerà con le istruzioni per pulirli.)"
+                ) % {'company': company.name, 'company_id': company.id})
 
     def action_open_pdcodm_setup_wizard(self):
         """Apre il wizard di setup PdC OdooManager per questa company.

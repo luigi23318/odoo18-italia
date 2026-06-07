@@ -358,7 +358,7 @@ class PdcodmSetupWizard(models.TransientModel):
         return len(to_deprecate)
 
     def _deprecate_l10n_it_residual_accounts(self, company):
-        """Marca `deprecated=True` i conti `l10n_it` standard residui
+        r"""Marca `deprecated=True` i conti `l10n_it` standard residui
         sulla company.
 
         Contesto: quando si installa il PdC OdooManager su una company
