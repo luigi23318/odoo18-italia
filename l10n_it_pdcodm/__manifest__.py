@@ -4,13 +4,18 @@
     'summary': "PdC italiano professionale alternativo a l10n_it standard, con compatibilità export Passepartout",
     'description': """
         Modulo Odoo 18 per la gestione contabile professionale italiana.
-        Fornisce un Piano dei Conti completo (~2100 conti) con voci CEE,
+        Fornisce un Piano dei Conti completo (~2121 conti) con voci CEE,
         deducibilità IRES/IRAP, regimi multipli e tabella di transcodifica
         per export bilancio verso Passepartout/ADP Bilancio.
 
         Coesiste con l10n_it standard senza sostituirlo: tasse IVA,
         fatturazione elettronica e configurazioni EDI restano invariate.
         Si attiva per singola company tramite flag dedicato.
+
+        Note legali: Passepartout è un marchio registrato di
+        Passepartout S.p.A.; questo modulo non è affiliato né endossato
+        da Passepartout S.p.A. La tabella di transcodifica è un dato di
+        interoperabilità, non una replica del database Passepartout.
     """,
     'author': "OdooManager.cloud",
     'website': "https://www.odoomanager.cloud",
