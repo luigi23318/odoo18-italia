@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <!-- PIVOT: percipiente x ritenuta x anno, misure = imponibile + ritenuta -->
+    <record id="view_withholding_cu_pivot" model="ir.ui.view">
+        <field name="name">l10n.it.withholding.cu.report.pivot</field>
+        <field name="model">l10n.it.withholding.cu.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Ritenute per percipiente">
+                <field name="partner_id" type="row" />
+                <field name="tax_id" type="row" />
+                <field name="date" interval="year" type="col" />
+                <field name="base_amount" type="measure" />
+                <field name="withholding_amount" type="measure" />
+            </pivot>
+        </field>
+    </record>
+
+    <!-- LISTA: dettaglio riga per riga -->
+    <record id="view_withholding_cu_list" model="ir.ui.view">
+        <field name="name">l10n.it.withholding.cu.report.list</field>
+        <field name="model">l10n.it.withholding.cu.report</field>
+        <field name="arch" type="xml">
+            <list string="Ritenute per percipiente" default_order="partner_id, date">
+                <field name="date" />
+                <field name="partner_id" />
+                <field name="tax_id" />
+                <field name="withholding_type" optional="show" />
+                <field name="direction" optional="show" />
+                <field name="origin_move_id" optional="show" />
+                <field name="move_id" optional="hide" />
+                <field name="account_id" optional="hide" />
+                <field name="base_amount" sum="Totale imponibile" />
+                <field name="withholding_amount" sum="Totale ritenuta" />
+                <field name="currency_id" column_invisible="1" />
+                <field name="company_id" groups="base.group_multi_company" optional="show" />
+            </list>
+        </field>
+    </record>
+
+    <!-- SEARCH -->
+    <record id="view_withholding_cu_search" model="ir.ui.view">
+        <field name="name">l10n.it.withholding.cu.report.search</field>
+        <field name="model">l10n.it.withholding.cu.report</field>
+        <field name="arch" type="xml">
+            <search string="Ritenute per percipiente">
+                <field name="partner_id" string="Percipiente" />
+                <field name="tax_id" string="Ritenuta / Causale" />
+                <field name="origin_move_id" string="Fattura origine" />
+                <separator />
+                <filter name="subite" string="Subite (vendite)"
+                        domain="[('direction', '=', 'sale')]" />
+                <filter name="operate" string="Operate (acquisti)"
+                        domain="[('direction', '=', 'purchase')]" />
+                <group expand="1" string="Raggruppa per">
+                    <filter name="gb_partner" string="Percipiente"
+                            context="{'group_by': 'partner_id'}" />
+                    <filter name="gb_tax" string="Ritenuta / Causale"
+                            context="{'group_by': 'tax_id'}" />
+                    <filter name="gb_direction" string="Direzione"
+                            context="{'group_by': 'direction'}" />
+                    <filter name="gb_year" string="Anno"
+                            context="{'group_by': 'date:year'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- AZIONE -->
+    <record id="action_withholding_cu_report" model="ir.actions.act_window">
+        <field name="name">Ritenute per percipiente (CU)</field>
+        <field name="res_model">l10n.it.withholding.cu.report</field>
+        <field name="view_mode">pivot,list</field>
+        <field name="search_view_id" ref="view_withholding_cu_search" />
+        <field name="context">{
+            'search_default_gb_partner': 1,
+            'search_default_gb_tax': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Nessuna ritenuta registrata.</p>
+            <p>
+                Dettaglio delle ritenute d'acconto realizzate per cassa
+                (al pagamento/incasso), con imponibile e ritenuta per percipiente,
+                causale e anno. Usa i filtri "subite" / "operate" per separare le direzioni.
+            </p>
+        </field>
+    </record>
+
+    <!-- MENU sotto Contabilità > Reporting -->
+    <menuitem
+        id="menu_withholding_cu_report"
+        name="Ritenute per percipiente (CU)"
+        parent="account.menu_finance_reports"
+        action="action_withholding_cu_report"
+        sequence="99"
+        groups="account.group_account_readonly" />
+
+</odoo>

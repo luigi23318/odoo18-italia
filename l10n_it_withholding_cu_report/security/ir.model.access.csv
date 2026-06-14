@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_wh_cu_report_readonly,l10n.it.withholding.cu.report readonly,model_l10n_it_withholding_cu_report,account.group_account_readonly,1,0,0,0
+access_wh_cu_report_invoice,l10n.it.withholding.cu.report invoice,model_l10n_it_withholding_cu_report,account.group_account_invoice,1,0,0,0
